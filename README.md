@@ -89,6 +89,10 @@ No API keys. No daemons phoning home. Just your Google session and a beautiful o
 | Open Settings | <kbd>Ctrl</kbd> + <kbd>,</kbd> | ❌ fixed |
 | Dismiss any overlay | <kbd>Esc</kbd> / outside click | — |
 
+**Where is Settings?** ⚙️ gear in the Gemini palette · system-tray right-click → *Settings…* · <kbd>Ctrl</kbd>+<kbd>,</kbd> · the palette on first launch opens it automatically.
+
+> **Circle to Search gestures:** *drag* selects a region; a plain *click* (no drag) searches the **full screen**; while Lens results are open, clicking the frozen screen dismisses everything. In the palette, the 📎 paperclip uses the same selection overlay — a click attaches the whole screen, a drag attaches just that region.
+
 > **Hold to Gemini** toggles: press once to open the palette, press again (or <kbd>Esc</kbd>) to dismiss — the friendliest "hold" behavior for a global hotkey, since Windows doesn't deliver global key-up events to background apps.
 
 > ⚠️ <kbd>Alt</kbd> + <kbd>Space</kbd> normally opens the focused window's system menu. Global shortcuts win, so it's safe to use — but you can rebind it in Settings if you prefer.
@@ -134,12 +138,13 @@ The artifact lands at `release/<version>/Gemini-Desktop-Companion-Setup-<version
 
 ## 🔐 Google Login & History
 
-1. Open **Settings → Google Account → Sign in** (or click the red dot in the Gemini palette).
-2. A browser-style window opens on `gemini.google.com` — sign in with your Google account.
-3. Cookies persist in an isolated, encrypted Chromium partition inside the app's profile, so **you only ever log in once**. The session is shared with a hidden background Gemini tab that the app drives.
-4. Every prompt you send — typed questions *and* screenshot-attached tasks — runs in that real Gemini session, so your **full conversation history is stored in your Google account**, searchable later at [gemini.google.com/app](https://gemini.google.com/app). The 🕘 button in the palette opens it instantly.
+Signing in is **required** for the palette to send prompts — signed-out Gemini is heavily rate-limited and saves no history:
 
-If Google ever expires the session, the status dot turns red — click **Sign in** again.
+1. On first launch (or whenever you're signed out) the palette shows a **Sign in** banner, and the sign-in window opens automatically. You can also use **Settings → Google Account**, the ⚙️ gear in the palette, or the red status dot.
+2. A browser-style window opens on `gemini.google.com` — sign in with your Google account. **The window closes itself the moment sign-in succeeds.**
+3. Cookies persist in an isolated Chromium partition, so **you only ever log in once**. Every prompt — typed or screenshot-attached — runs in your real Gemini session and is **saved to your account history** at [gemini.google.com/app](https://gemini.google.com/app). The 🕘 button opens it instantly.
+
+If Google ever expires the session, the status dot turns red and the banner returns — click **Sign in** again.
 
 ## 📁 Project Structure
 

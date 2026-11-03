@@ -36,6 +36,10 @@ const sendBtn = document.getElementById('btn-send') as HTMLButtonElement
 const attachBtn = document.getElementById('btn-attach') as HTMLButtonElement
 const closeBtn = document.getElementById('btn-close') as HTMLButtonElement
 const historyBtn = document.getElementById('btn-history') as HTMLButtonElement
+const settingsBtn = document.getElementById('btn-settings') as HTMLButtonElement
+const signinBanner = document.getElementById('signin-banner') as HTMLElement
+const signinBtn = document.getElementById('btn-signin') as HTMLButtonElement
+const errorOpenGemini = document.getElementById('error-opengemini') as HTMLButtonElement
 
 let attachment: Attachment | null = null
 let login: LoginState = { loggedIn: false, unknown: true }
@@ -89,10 +93,23 @@ function setLogin(state: LoginState): void {
     : state.loggedIn
       ? 'Google account connected — chats save to your history'
       : 'Not signed in — click to sign in'
+  loginDot.onclick = () => void window.gdc.settings.openLogin()
+
+  const signedOut = !state.unknown && !state.loggedIn
+  signinBanner.hidden = !signedOut
+  prompt.disabled = signedOut
+  if (signedOut) {
+    prompt.placeholder = 'Sign in to start asking…'
+    sendBtn.disabled = true
+  } else {
+    prompt.placeholder = 'Ask Gemini anything…'
+    autoSize()
+  }
 }
 
 /* ── Events from main ──────────────────────────────────────────────────── */
 window.gdc.gemini.onAttachment((payload) => setAttachment(payload as Attachment | null))
+window.gdc.gemini.onLoginChanged((payload) => setLogin(payload as LoginState))
 window.gdc.gemini.onStatus((payload) => {
   const p = payload as GeminiStatusPayload
   if (p.stage === 'working') {
@@ -131,6 +148,7 @@ window.gdc.gemini.onError((payload) => {
   errorTitle.textContent = p.code === 'NOT_LOGGED_IN' ? 'Not signed in' : 'Something went wrong'
   errorMessage.textContent = p.message
   errorSignin.hidden = !p.needsLogin
+  errorOpenGemini.hidden = !(p.code === 'NO_RESPONSE' || p.code === 'SUBMIT_FAILED')
 })
 
 /* ── Actions ───────────────────────────────────────────────────────────── */
@@ -147,6 +165,9 @@ attachBtn.addEventListener('click', () => void window.gdc.gemini.attachFromScree
 removeAttachmentBtn.addEventListener('click', () => void window.gdc.gemini.removeAttachment())
 closeBtn.addEventListener('click', close)
 historyBtn.addEventListener('click', () => void window.gdc.gemini.openHistory())
+settingsBtn.addEventListener('click', () => void window.gdc.settings.open())
+signinBtn.addEventListener('click', () => void window.gdc.settings.openLogin())
+errorOpenGemini.addEventListener('click', () => void window.gdc.gemini.openHistory())
 newChatBtn.addEventListener('click', () => {
   responseText = ''
   hasResponse = false
@@ -207,6 +228,10 @@ window.addEventListener('keydown', (e) => {
 let lastCopyOk = false
 
 async function submit(forceText?: string, isRetry = false): Promise<void> {
+  if (login && !login.unknown && !login.loggedIn) {
+    showError('NOT_LOGGED_IN', 'Sign in with Google first — signed-out Gemini is rate-limited and saves no history.')
+    return
+  }
   const text = (forceText ?? prompt.value).trim()
   if (!text && !attachment && !isRetry) return
   lastPrompt = text || lastPrompt

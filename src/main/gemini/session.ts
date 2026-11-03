@@ -11,6 +11,16 @@ const PAGE_SUBMIT = `
 window.__gdcSubmit = async ({ text, imageB64 }) => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   try {
+    // Dismiss first-run consent / intro dialogs if present.
+    try {
+      for (const label of ['continue', 'get started', 'i agree', 'accept', 'got it']) {
+        const btn = [...document.querySelectorAll('button')].find((b) =>
+          (b.textContent || '').trim().toLowerCase() === label && b.offsetParent !== null
+        )
+        if (btn) { btn.click(); await sleep(500) }
+      }
+    } catch (e) { /* no dialog — fine */ }
+
     const input =
       document.querySelector('rich-textarea .ql-editor[contenteditable="true"], div.ql-editor[contenteditable="true"]') ||
       document.querySelector('textarea')
@@ -24,16 +34,41 @@ window.__gdcSubmit = async ({ text, imageB64 }) => {
         const file = new File([bytes], 'screenshot.png', { type: 'image/png' })
         const dt = new DataTransfer()
         dt.items.add(file)
-        const fileInput = document.querySelector('input[type="file"]')
+
+        // 1) a file input may already exist
+        let fileInput = document.querySelector('input[type=file]')
+        // 2) open Gemini's own "Upload & tools" button to materialise one
+        if (!fileInput) {
+          const uploadBtn = [...document.querySelectorAll('button')].find((b) =>
+            /upload/i.test(b.getAttribute('aria-label') || '')
+          )
+          if (uploadBtn) {
+            uploadBtn.click()
+            await sleep(700)
+            fileInput = document.querySelector('input[type=file]')
+          }
+        }
+        // 3) the upload menu may need an explicit "Upload files" item
+        if (!fileInput) {
+          const item = [...document.querySelectorAll('[role="menuitem"], [role="option"], button, a')]
+            .find((el) => /upload files?/i.test((el.textContent || '').trim()))
+          if (item) {
+            item.click()
+            await sleep(1400)
+            fileInput = document.querySelector('input[type=file]')
+          }
+        }
         if (fileInput) {
           fileInput.files = dt.files
           fileInput.dispatchEvent(new Event('change', { bubbles: true }))
+          await sleep(1500)
         } else {
+          // last resort: synthetic paste
           const evt = new Event('paste', { bubbles: true, cancelable: true })
           Object.defineProperty(evt, 'clipboardData', { value: dt })
           input.dispatchEvent(evt)
+          await sleep(1500)
         }
-        await sleep(1200)
       } catch (e) {
         console.warn('gdc: attachment failed', e)
       }
@@ -73,37 +108,46 @@ window.__gdcSubmit = async ({ text, imageB64 }) => {
 }
 `
 
-/** Page-side bridge: streaming response observer (MutationObserver-based). */
+/**
+ * Page-side bridge: streaming response observer.
+ *
+ * Ground-truth notes (verified against the live DOM):
+ *  - Assistant replies live in <model-response> / <message-content> custom
+ *    elements. The pending user turn is <user-query>/<PENDING-REQUEST> and
+ *    must NOT be captured — so we deliberately exclude
+ *    `.conversation-container`, which matches both.
+ *  - The text can sit in non-rendered containers where `innerText` returns
+ *    "" — `textContent` always carries it.
+ */
 const PAGE_OBSERVER = `
 if (!window.__gdcObserver) {
   window.__gdcBaseline = 0
   window.__gdcResetStream = () => {
-    window.__gdcBaseline = document.querySelectorAll(
-      'model-response, message-content, .conversation-container'
-    ).length
+    window.__gdcBaseline = document.querySelectorAll('model-response, message-content').length
   }
   window.__gdcResetStream()
 
   let lastText = ''
   let settle = null
-  const RESPONSE_NODES = 'model-response, message-content, .conversation-container'
+  const RESPONSE_NODES = 'model-response, message-content'
 
   const getResponseText = () => {
     const nodes = document.querySelectorAll(RESPONSE_NODES)
     if (!nodes.length) return ''
     const el = nodes[nodes.length - 1]
-    const md = el.querySelector('.markdown') || el
-    return (md.innerText || '').trim()
+    const md = el.querySelector('.markdown')
+    const text = ((md || el).textContent || '').trim()
+    return text
   }
 
   const flush = (settled) => {
     const count = document.querySelectorAll(RESPONSE_NODES).length
     if (count <= window.__gdcBaseline) return
     const t = getResponseText()
-    if (t !== lastText) {
+    if (t && t !== lastText) {
       lastText = t
-      if (window.geminiPageBridge) window.geminiPageBridge.stream(t, settled && t.length > 0)
-    } else if (settled && t.length > 0 && window.geminiPageBridge) {
+      if (window.geminiPageBridge) window.geminiPageBridge.stream(t, settled)
+    } else if (settled && t && t === lastText && window.geminiPageBridge) {
       window.geminiPageBridge.stream(t, true)
     }
   }
@@ -111,7 +155,7 @@ if (!window.__gdcObserver) {
   const mo = new MutationObserver(() => {
     clearTimeout(settle)
     flush(false)
-    settle = setTimeout(() => flush(true), 1400)
+    settle = setTimeout(() => flush(true), 1500)
   })
   mo.observe(document.body, { childList: true, subtree: true, characterData: true })
   window.__gdcObserver = mo
@@ -123,8 +167,11 @@ export class GeminiSession extends EventEmitter {
   private loading: Promise<void> | null = null
   private streamText = ''
   private active = false
+  private noResponseTimer: NodeJS.Timeout | null = null
   private hardTimer: NodeJS.Timeout | null = null
   private cachedLogin: LoginState = { loggedIn: false, unknown: true }
+  private loginCheckedAt = 0
+  private loginInflight: Promise<LoginState> | null = null
 
   /** Create (or reuse) the hidden Gemini web window and make sure it is loaded. */
   async ensureWindow(): Promise<BrowserWindow> {
@@ -167,10 +214,11 @@ export class GeminiSession extends EventEmitter {
     this.loading = (async () => {
       try {
         await this.win?.loadURL(GEMINI_URL)
+        log('[gemini] hidden session loaded')
       } catch (err) {
-        console.error('[gemini] initial load failed:', err)
+        log(`[gemini] initial load failed: ${String(err)}`)
       }
-      await delay(900)
+      await delay(1200)
     })()
     await this.loading
     this.loading = null
@@ -184,13 +232,19 @@ export class GeminiSession extends EventEmitter {
       await this.ensureWindow()
       await this.refreshLoginState()
     } catch (err) {
-      console.error('[gemini] preload failed:', err)
+      log(`[gemini] preload failed: ${String(err)}`)
     }
   }
 
   private async injectBridges(): Promise<void> {
     if (!this.win || this.win.isDestroyed()) return
     try {
+      // Cheap idempotence check first — callers (login polling, submits)
+      // invoke this often and the full injection is not free.
+      const present = await this.win.webContents.executeJavaScript(
+        '!!window.__gdcObserver && typeof window.__gdcSubmit === "function"'
+      )
+      if (present === true) return
       await this.win.webContents.executeJavaScript(PAGE_SUBMIT)
       await this.win.webContents.executeJavaScript(PAGE_OBSERVER)
     } catch {
@@ -198,35 +252,60 @@ export class GeminiSession extends EventEmitter {
     }
   }
 
-  /** Best-effort Google sign-in detection from the Gemini page DOM. */
+  /**
+   * Accurate Google sign-in detection. Ground truth: a signed-out page shows
+   * an `accounts.google.com` "Sign in" link and has no profile avatar image;
+   * containers like [data-ogsr-up] exist in BOTH states and must not be
+   * treated as an avatar. Results are cached briefly so pollers don't hammer
+   * the page with executeJavaScript.
+   */
   async refreshLoginState(): Promise<LoginState> {
+    if (this.loginInflight) return this.loginInflight
+    if (Date.now() - this.loginCheckedAt < 10_000) {
+      return this.cachedLogin
+    }
+    this.loginInflight = this.doRefreshLoginState().finally(() => {
+      this.loginCheckedAt = Date.now()
+      this.loginInflight = null
+    })
+    return this.loginInflight
+  }
+
+  private async doRefreshLoginState(): Promise<LoginState> {
     try {
       const win = await this.ensureWindow()
       const state = (await win.webContents.executeJavaScript(`(() => {
         try {
-          const avatar = document.querySelector(
-            'img.gbii, img.gbs, a[aria-label*="Google Account" i], a[href*="SignOutOptions"], [data-ogsr-up]'
-          )
-          const signIn = document.querySelector(
-            'a[href*="accounts.google.com"], [data-test-id="sign-in-button"], a[aria-label="Sign in" i]'
-          )
           return {
             ready: document.readyState === 'complete',
             onGemini: location.host === 'gemini.google.com',
-            hasAvatar: !!avatar,
-            hasSignIn: !!signIn
+            avatarImg: !!document.querySelector('img.gbii, img.gbs, img[alt*="profile" i]'),
+            signInLink: !!document.querySelector('a[href*="accounts.google.com/ServiceLogin"], a[href*="accounts.google.com/v3/signin"], a[href*="ServiceLogin"]')
           }
         } catch (e) {
-          return { ready: false, onGemini: false, hasAvatar: false, hasSignIn: false }
+          return { ready: false, onGemini: false, avatarImg: false, signInLink: false }
         }
-      })()`)) as { ready: boolean; onGemini: boolean; hasAvatar: boolean; hasSignIn: boolean }
+      })()`)) as {
+        ready: boolean
+        onGemini: boolean
+        avatarImg: boolean
+        signInLink: boolean
+      }
 
       const determined = state.onGemini && state.ready
+      const previous = this.cachedLogin.loggedIn
       this.cachedLogin = {
-        loggedIn: determined ? state.hasAvatar || !state.hasSignIn : false,
+        loggedIn: determined ? state.avatarImg && !state.signInLink : false,
         unknown: !determined
       }
-    } catch {
+      if (this.cachedLogin.loggedIn && !previous && !this.cachedLogin.unknown) {
+        log('[gemini] Google account signed in — reloading hidden session')
+        void this.reload()
+      } else if (determined && previous !== this.cachedLogin.loggedIn) {
+        log(`[gemini] login state changed: ${this.cachedLogin.loggedIn ? 'signed in' : 'signed out'}`)
+      }
+    } catch (err) {
+      log(`[gemini] login check failed: ${String(err)}`)
       this.cachedLogin = { loggedIn: false, unknown: true }
     }
     return this.cachedLogin
@@ -234,6 +313,18 @@ export class GeminiSession extends EventEmitter {
 
   getCachedLoginState(): LoginState {
     return this.cachedLogin
+  }
+
+  /** Reload the hidden page (used after sign-in so cookies take effect). */
+  async reload(): Promise<void> {
+    if (!this.win || this.win.isDestroyed()) return
+    try {
+      await this.win.loadURL(GEMINI_URL)
+      await delay(1200)
+      await this.injectBridges()
+    } catch (err) {
+      log(`[gemini] reload failed: ${String(err)}`)
+    }
   }
 
   /** Inject prompt + optional screenshot into the background Gemini page. */
@@ -244,14 +335,23 @@ export class GeminiSession extends EventEmitter {
     this.clearTimers()
     this.emit('status', { stage: 'working', detail: imageB64 ? 'Uploading screenshot…' : 'Thinking…' })
 
-    // 2-minute safety net so the widget never hangs forever.
+    // Signed-out Gemini rate-limits heavily; give it room, but never hang.
+    this.noResponseTimer = setTimeout(() => {
+      if (this.active && this.streamText.length === 0) {
+        this.fail(
+          'NO_RESPONSE',
+          'Gemini did not return a response. If this keeps happening, make sure you are signed in — signed-out usage is heavily rate-limited.',
+          true
+        )
+      }
+    }, 60_000)
     this.hardTimer = setTimeout(() => {
       if (this.active && this.streamText.length > 0) {
         this.finish()
       } else if (this.active) {
-        this.fail('NO_RESPONSE', 'Gemini did not respond in time. Please try again.')
+        this.fail('NO_RESPONSE', 'Gemini did not respond in time. Please try again.', true)
       }
-    }, 120_000)
+    }, 150_000)
 
     await win.webContents.executeJavaScript('window.__gdcResetStream && window.__gdcResetStream()')
     const result = (await win.webContents.executeJavaScript(
@@ -279,7 +379,7 @@ export class GeminiSession extends EventEmitter {
       })()`)
       await win.webContents.executeJavaScript('window.__gdcResetStream && window.__gdcResetStream()')
     } catch (err) {
-      console.error('[gemini] newChat failed:', err)
+      log(`[gemini] newChat failed: ${String(err)}`)
     }
   }
 
@@ -328,6 +428,10 @@ export class GeminiSession extends EventEmitter {
   }
 
   private clearTimers(): void {
+    if (this.noResponseTimer) {
+      clearTimeout(this.noResponseTimer)
+      this.noResponseTimer = null
+    }
     if (this.hardTimer) {
       clearTimeout(this.hardTimer)
       this.hardTimer = null
@@ -340,6 +444,19 @@ let sessionSingleton: GeminiSession | null = null
 export function getGeminiSession(): GeminiSession {
   if (!sessionSingleton) sessionSingleton = new GeminiSession()
   return sessionSingleton
+}
+
+/**
+ * Deny every permission request (notifications, geolocation, …) on the
+ * Google-facing sessions so the hidden Gemini tab can never leak its
+ * response previews as Windows toasts.
+ */
+export function applyPermissionGuards(): void {
+  for (const name of ['persist:gemini', 'persist:lens']) {
+    const ses = electronSession.fromPartition(name)
+    ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
+    ses.setPermissionCheckHandler(() => false)
+  }
 }
 
 /** Apply the Chrome-like user agent to every Google-facing session. */

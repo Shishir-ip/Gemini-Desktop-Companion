@@ -120,6 +120,7 @@ export function registerIpc(): void {
     return state
   })
   ipcMain.handle(IPC.SettingsOpenLogin, () => openLoginWindow())
+  ipcMain.handle(IPC.SettingsOpen, () => openSettings())
   ipcMain.handle(IPC.SettingsCheckUpdates, () => checkForUpdates(true))
   ipcMain.handle(IPC.SettingsOpenHistory, () => openGeminiVisible())
 

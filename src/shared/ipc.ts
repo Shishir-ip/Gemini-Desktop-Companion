@@ -19,6 +19,7 @@ export const IPC = {
   GeminiNewChat: 'gemini:new-chat',
   GeminiClose: 'gemini:close',
   WidgetSetIgnoreMouse: 'widget:set-ignore-mouse',
+  GeminiLoginChanged: 'gemini:login-changed', // main → widget renderer
   GeminiStatus: 'gemini:status', // main → renderer
   GeminiChunk: 'gemini:chunk', // main → renderer
   GeminiDone: 'gemini:done', // main → renderer
@@ -26,6 +27,7 @@ export const IPC = {
   GeminiAttachmentChanged: 'gemini:attachment-changed', // main → renderer
 
   // ── Settings ────────────────────────────────────────────────────────────
+  SettingsOpen: 'settings:open',
   SettingsGetAll: 'settings:get-all',
   SettingsSetHotkeys: 'settings:set-hotkeys',
   SettingsSetStartup: 'settings:set-startup',

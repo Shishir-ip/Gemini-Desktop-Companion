@@ -210,6 +210,42 @@ body.closing #input-card {
   flex: 1;
 }
 
+#signin-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(79, 140, 255, 0.14), rgba(168, 85, 247, 0.14));
+  border: 1px solid rgba(126, 166, 255, 0.35);
+}
+#signin-banner[hidden] {
+  display: none;
+}
+.signin-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.signin-title {
+  font-size: 12.5px;
+  font-weight: 620;
+  color: #cfe0ff;
+}
+.signin-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+#btn-signin {
+  padding: 7px 14px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
 #attachment-chip {
   display: flex;
   align-items: center;

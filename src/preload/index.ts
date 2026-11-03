@@ -23,11 +23,13 @@ const IPC = {
   GeminiNewChat: 'gemini:new-chat',
   GeminiClose: 'gemini:close',
   WidgetSetIgnoreMouse: 'widget:set-ignore-mouse',
+  GeminiLoginChanged: 'gemini:login-changed',
   GeminiStatus: 'gemini:status',
   GeminiChunk: 'gemini:chunk',
   GeminiDone: 'gemini:done',
   GeminiError: 'gemini:error',
   GeminiAttachmentChanged: 'gemini:attachment-changed',
+  SettingsOpen: 'settings:open',
   SettingsGetAll: 'settings:get-all',
   SettingsSetHotkeys: 'settings:set-hotkeys',
   SettingsSetStartup: 'settings:set-startup',
@@ -75,7 +77,8 @@ const api = {
     onChunk: (cb: Listener<unknown>) => subscribe(IPC.GeminiChunk, cb),
     onDone: (cb: Listener<unknown>) => subscribe(IPC.GeminiDone, cb),
     onError: (cb: Listener<unknown>) => subscribe(IPC.GeminiError, cb),
-    onAttachment: (cb: Listener<unknown>) => subscribe(IPC.GeminiAttachmentChanged, cb)
+    onAttachment: (cb: Listener<unknown>) => subscribe(IPC.GeminiAttachmentChanged, cb),
+    onLoginChanged: (cb: Listener<unknown>) => subscribe(IPC.GeminiLoginChanged, cb)
   },
 
   /**
@@ -89,6 +92,7 @@ const api = {
 
   /** Settings window. */
   settings: {
+    open: () => ipcRenderer.invoke(IPC.SettingsOpen),
     getAll: () => ipcRenderer.invoke(IPC.SettingsGetAll),
     setHotkeys: (hotkeys: { circleToSearch: string; holdToGemini: string }) =>
       ipcRenderer.invoke(IPC.SettingsSetHotkeys, hotkeys),

@@ -12,11 +12,14 @@ const dim = document.getElementById('dim') as HTMLDivElement
 const sel = document.getElementById('sel') as HTMLDivElement
 const selBox = document.getElementById('sel-box') as HTMLDivElement
 const selBadge = document.getElementById('sel-badge') as HTMLDivElement
+const hintText = document.getElementById('hint-text') as HTMLElement
+const attachHint = document.getElementById('attach-hint') as HTMLElement
 
 let mode: CircleMode = 'lens'
 let lensMode = false
 let scaleFactor = 1
 let dragging = false
+let moved = false
 let startX = 0
 let startY = 0
 
@@ -39,6 +42,12 @@ async function init(): Promise<void> {
     img.onerror = () => reject(new Error('screenshot decode failed'))
     img.src = capture.dataUrl
   })
+
+  // Mode-specific instructions — the #1 complaint was not knowing to drag.
+  if (mode === 'attach') {
+    hintText.textContent = 'Drag over the region to attach'
+    attachHint.hidden = false
+  }
 
   // Paint one frame, then tell the main process we're alive and interactive
   // (clears its dead-renderer watchdog).
@@ -76,6 +85,7 @@ sel.addEventListener('pointerdown', (e) => {
   }
   if (e.button !== 0) return
   dragging = true
+  moved = false
   startX = e.clientX
   startY = e.clientY
   sel.setPointerCapture(e.pointerId)
@@ -85,6 +95,7 @@ sel.addEventListener('pointerdown', (e) => {
 
 sel.addEventListener('pointermove', (e) => {
   if (!dragging) return
+  if (Math.abs(e.clientX - startX) > 6 || Math.abs(e.clientY - startY) > 6) moved = true
   updateBox(e.clientX, e.clientY)
 })
 
@@ -92,6 +103,19 @@ sel.addEventListener('pointerup', (e) => {
   if (!dragging) return
   dragging = false
   const rect = normalizedRect(e.clientX, e.clientY)
+
+  if (!moved) {
+    // A plain click (no drag):
+    //  - attach mode → attach the entire screen (most forgiving default)
+    //  - lens mode   → treat as a dismiss
+    if (mode === 'attach') {
+      void submitCrop({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight })
+    } else {
+      void window.gdc.circle.dismissAll()
+    }
+    return
+  }
+
   if (rect.width < 10 || rect.height < 10) {
     resetSelection()
     return

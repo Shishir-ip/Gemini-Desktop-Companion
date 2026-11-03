@@ -1,12 +1,12 @@
 import { app, globalShortcut, nativeTheme, dialog } from 'electron'
-import { applyGoogleFriendlyUserAgents, getGeminiSession } from './gemini/session'
+import { applyGoogleFriendlyUserAgents, applyPermissionGuards, getGeminiSession } from './gemini/session'
 import { registerIpc } from './ipc'
 import { createTray, destroyTray, notifyTray } from './tray'
 import { registerAllHotkeys, registrationStatus } from './shortcuts'
 import { applyLaunchAtStartup } from './startup'
 import { startCircleToSearch } from './windows/overlay'
 import { showGeminiWidget } from './windows/geminiWidget'
-import { openSettings } from './windows/settingsWindow'
+import { openSettings, openLoginWindow } from './windows/settingsWindow'
 import { store } from './store'
 import { initLogger, log } from './logger'
 
@@ -41,6 +41,9 @@ if (!app.requestSingleInstanceLock()) {
 
     // Chrome-like user agent so Google serves full pages (login + Gemini).
     applyGoogleFriendlyUserAgents()
+    // No web notifications from the hidden Gemini/Lens sessions — responses
+    // must stream into the palette, never leak as Windows toasts.
+    applyPermissionGuards()
 
     registerIpc()
     createTray()
@@ -71,8 +74,11 @@ if (!app.requestSingleInstanceLock()) {
         else showGeminiWidget()
       }, 1500)
     } else if (manualLaunch) {
+      const firstRun = !store.get('welcomed')
       showGeminiWidget()
-      if (!store.get('welcomed')) {
+      if (firstRun) {
+        // First launch: surface the actual UI — settings with the account
+        // card is the natural "home screen" for a tray app like this.
         store.set('welcomed', true)
         const hk = store.get('hotkeys').holdToGemini
         notifyTray(
@@ -80,6 +86,19 @@ if (!app.requestSingleInstanceLock()) {
           `Look for the ✨ sparkle in your system tray (check the ^ overflow). ` +
             `Press ${hk} anywhere to ask Gemini, ${store.get('hotkeys').circleToSearch} for Circle to Search.`
         )
+        setTimeout(() => openSettings(), 400)
+      } else if (!process.argv.includes('--gdc-open=')) {
+        // Returning user: if they're signed out, bring the sign-in window up
+        // front — signed-out Gemini is rate-limited and saves no history.
+        setTimeout(() => {
+          void (async () => {
+            const state = await getGeminiSession().refreshLoginState()
+            if (!state.loggedIn && !state.unknown) {
+              log('[app] signed out on launch — opening sign-in window')
+              await openLoginWindow()
+            }
+          })()
+        }, 6000)
       }
     }
   })

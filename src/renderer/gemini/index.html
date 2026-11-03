@@ -26,6 +26,7 @@
             <button id="error-signin" class="glass-btn glass-btn-primary" hidden>
               Sign in with Google
             </button>
+            <button id="error-opengemini" class="glass-btn" hidden>Open Gemini</button>
             <button id="error-retry" class="glass-btn">Retry</button>
           </div>
         </div>
@@ -49,6 +50,9 @@
           <span class="title">Gemini</span>
           <span id="login-dot" class="login-dot unknown" title="Checking Google session…"></span>
           <span class="spacer"></span>
+          <button id="btn-settings" class="icon-btn" title="Settings">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
           <button id="btn-history" class="icon-btn" title="Open Gemini history (full session)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/><path d="M12 7v5l3.5 2"/></svg>
           </button>
@@ -58,6 +62,14 @@
           <button id="btn-close" class="icon-btn" title="Close (Esc)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
           </button>
+        </div>
+
+        <div id="signin-banner" hidden>
+          <div class="signin-text">
+            <span class="signin-title">Sign in with Google to use Gemini</span>
+            <span class="signin-sub">Chats save to your account history · signed-out usage is rate-limited</span>
+          </div>
+          <button id="btn-signin" class="glass-btn glass-btn-primary">Sign in</button>
         </div>
 
         <div id="attachment-chip" hidden>
