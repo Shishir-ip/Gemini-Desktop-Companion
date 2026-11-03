@@ -2,6 +2,7 @@
 export const IPC = {
   // ── Circle to Search overlay ────────────────────────────────────────────
   CircleGetCapture: 'circle:get-capture',
+  CircleReady: 'circle:ready',
   CircleSelected: 'circle:selected',
   CircleCancel: 'circle:cancel',
   CircleDismissAll: 'circle:dismiss-all',
@@ -17,6 +18,7 @@ export const IPC = {
   GeminiRemoveAttachment: 'gemini:remove-attachment',
   GeminiNewChat: 'gemini:new-chat',
   GeminiClose: 'gemini:close',
+  WidgetSetIgnoreMouse: 'widget:set-ignore-mouse',
   GeminiStatus: 'gemini:status', // main → renderer
   GeminiChunk: 'gemini:chunk', // main → renderer
   GeminiDone: 'gemini:done', // main → renderer

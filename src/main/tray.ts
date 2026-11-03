@@ -37,3 +37,12 @@ export function destroyTray(): void {
   tray?.destroy()
   tray = null
 }
+
+/** Native Windows toast/balloon from the tray icon. */
+export function notifyTray(title: string, content: string): void {
+  try {
+    tray?.displayBalloon({ iconType: 'info', title, content, noSound: true })
+  } catch (err) {
+    console.error('[tray] displayBalloon failed:', err)
+  }
+}

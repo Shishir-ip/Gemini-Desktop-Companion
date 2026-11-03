@@ -13,11 +13,18 @@ import {
   isLensModeActive,
   registerOverlayIpc,
   getCircleMode,
-  startCircleToSearch
+  startCircleToSearch,
+  markOverlayReady
 } from './windows/overlay'
 import { retryLensUpload } from './windows/lensPanel'
-import { hideGeminiWidget, showGeminiWidget, forwardGeminiEvent } from './windows/geminiWidget'
+import {
+  hideGeminiWidget,
+  showGeminiWidget,
+  forwardGeminiEvent,
+  setWidgetIgnoreMouse
+} from './windows/geminiWidget'
 import { openLoginWindow, openGeminiVisible, openSettings, pushLoginChanged } from './windows/settingsWindow'
+import { log } from './logger'
 
 /**
  * Single place where every IPC channel is wired. Session events are bridged
@@ -55,6 +62,7 @@ export function registerIpc(): void {
       ? attachment.dataUrl.replace(/^data:image\/\w+;base64,/, '')
       : null
     clearPendingAttachment()
+    log(`[gemini] submitting prompt (${prompt.length} chars, image: ${!!imageB64})`)
     try {
       await session.submit(prompt || 'Describe this screenshot.', imageB64)
     } catch (err) {
@@ -73,6 +81,9 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.GeminiRemoveAttachment, () => clearPendingAttachment())
   ipcMain.handle(IPC.GeminiNewChat, () => session.newChat())
   ipcMain.handle(IPC.GeminiClose, () => hideGeminiWidget())
+  ipcMain.handle(IPC.WidgetSetIgnoreMouse, (_event, ignore: boolean) => {
+    setWidgetIgnoreMouse(Boolean(ignore))
+  })
 
   // ── Settings ─────────────────────────────────────────────────────────
   ipcMain.handle(IPC.SettingsGetAll, () => ({

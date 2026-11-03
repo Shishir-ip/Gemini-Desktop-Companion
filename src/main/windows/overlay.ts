@@ -7,23 +7,33 @@ import { captureAllDisplays, type DisplayCapture } from '../screenshot'
 import { setPendingAttachment } from '../attachment'
 import { openLensPanel, closeLensPanel } from './lensPanel'
 import { showGeminiWidget } from './geminiWidget'
+import { log } from '../logger'
 
 const overlays = new Map<number, BrowserWindow>()
 const windowDisplay = new WeakMap<BrowserWindow, number>()
+/** Windows whose renderer has confirmed it painted and is interactive. */
+const readyWindows = new Set<BrowserWindow>()
 let captures: Map<number, DisplayCapture> = new Map()
 let mode: CircleMode = 'lens'
 let lensModeActive = false
+
+const READY_WATCHDOG_MS = 7000
 
 export function getCircleMode(): CircleMode {
   return mode
 }
 
-export function isOverlayOpen(): boolean {
-  return overlays.size > 0
-}
-
 export function displayIdForWindow(win: BrowserWindow): number | null {
   return windowDisplay.get(win) ?? null
+}
+
+/** The renderer signals it painted and wired its handlers. */
+export function markOverlayReady(sender: Electron.WebContents): void {
+  const win = BrowserWindow.fromWebContents(sender)
+  if (win) {
+    readyWindows.add(win)
+    log('[circle] overlay renderer ready')
+  }
 }
 
 /** Freeze every display behind a full-screen selection overlay. */
@@ -35,11 +45,11 @@ export async function startCircleToSearch(m: CircleMode = 'lens'): Promise<void>
   try {
     captures = await captureAllDisplays()
   } catch (err) {
-    console.error('[circle] capture failed:', err)
+    log(`[circle] capture failed: ${String(err)}`)
     return
   }
   if (captures.size === 0) {
-    console.error('[circle] no displays captured')
+    log('[circle] no displays captured — aborting (no blocker window will be shown)')
     return
   }
 
@@ -48,13 +58,6 @@ export async function startCircleToSearch(m: CircleMode = 'lens'): Promise<void>
     if (!display) continue
     createOverlay(display, displayId, capture)
   }
-
-  // Safety net: if ready-to-show never fires (rare), force-show.
-  setTimeout(() => {
-    for (const win of overlays.values()) {
-      if (!win.isDestroyed() && !win.isVisible()) win.show()
-    }
-  }, 2500)
 }
 
 function createOverlay(display: Display, displayId: number, capture: DisplayCapture): void {
@@ -84,14 +87,48 @@ function createOverlay(display: Display, displayId: number, capture: DisplayCapt
   win.setAlwaysOnTop(true, 'screen-saver')
   windowDisplay.set(win, displayId)
   overlays.set(displayId, win)
-  win.on('closed', () => overlays.delete(displayId))
-  loadRendererPage(win, 'circle')
+  void capture // fetched by the renderer via IPC.CircleGetCapture
+
+  // ── Safety rails: an overlay must NEVER linger as an invisible
+  //    input-blocking window. Any failure path destroys it. ────────────────
+  const watchdog = setTimeout(() => {
+    if (!win.isDestroyed() && !readyWindows.has(win)) {
+      log('[circle] watchdog: overlay renderer never became ready — destroying all overlays')
+      closeAllSearchUI()
+    }
+  }, READY_WATCHDOG_MS)
+
+  win.webContents.on('did-fail-load', (_event, code, desc, _url, isMainFrame) => {
+    if (!isMainFrame) return
+    log(`[circle] overlay load failed (${code} ${desc}) — destroying all overlays`)
+    clearTimeout(watchdog)
+    closeAllSearchUI()
+  })
+  win.webContents.on('render-process-gone', (_event, details) => {
+    log(`[circle] renderer gone (${details.reason}) — destroying all overlays`)
+    clearTimeout(watchdog)
+    closeAllSearchUI()
+  })
+  // Guaranteed Esc kill-switch — handled in the MAIN process, so it works
+  // even if the renderer is dead, hung, or blank.
+  win.webContents.on('before-input-event', (_event, input) => {
+    if (input.type === 'keyDown' && input.key === 'Escape') {
+      closeAllSearchUI()
+    }
+  })
   win.once('ready-to-show', () => {
     if (win.isDestroyed()) return
     win.show()
     win.focus()
+    win.webContents.invalidate() // defensive repaint nudge for transparent windows
   })
-  void capture // used via IPC.CircleGetCapture
+  win.on('closed', () => {
+    clearTimeout(watchdog)
+    readyWindows.delete(win)
+    overlays.delete(displayId)
+  })
+
+  loadRendererPage(win, 'circle')
 }
 
 /** The renderer asks for its display's frozen frame once loaded. */
@@ -113,12 +150,14 @@ export function getCaptureForWindow(win: BrowserWindow): {
  */
 export function handleSelection(dataUrl: string, displayId: number): void {
   if (mode === 'attach') {
+    log('[circle] selection captured for Gemini attachment')
     setPendingAttachment({ dataUrl, source: 'selection', createdAt: Date.now() })
     closeAllOverlays()
     showGeminiWidget()
     return
   }
 
+  log('[circle] selection captured — opening Google Lens panel')
   const display =
     screen.getAllDisplays().find((d) => d.id === displayId) ?? screen.getPrimaryDisplay()
   lensModeActive = true
@@ -154,6 +193,7 @@ export function registerOverlayIpc(): void {
     const win = BrowserWindow.fromWebContents(event.sender)
     return win ? getCaptureForWindow(win) : null
   })
+  ipcMain.on(IPC.CircleReady, (event) => markOverlayReady(event.sender))
   ipcMain.handle(IPC.CircleSelected, (event, dataUrl: string) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     const displayId = win ? displayIdForWindow(win) : null

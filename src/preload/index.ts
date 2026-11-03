@@ -1,8 +1,45 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { IPC } from '../shared/ipc'
-import type { Hotkeys } from '../shared/types'
 
 type Listener<T> = (payload: T) => void
+
+/**
+ * NOTE: Channel names are duplicated here (instead of importing
+ * src/shared/ipc.ts) because sandboxed preload scripts cannot load
+ * code-split chunks — each preload bundle must be fully self-contained.
+ * Keep in sync with src/shared/ipc.ts.
+ */
+const IPC = {
+  CircleGetCapture: 'circle:get-capture',
+  CircleReady: 'circle:ready',
+  CircleSelected: 'circle:selected',
+  CircleCancel: 'circle:cancel',
+  CircleDismissAll: 'circle:dismiss-all',
+  CircleSetLensMode: 'circle:set-lens-mode',
+  LensRetry: 'lens:retry',
+  GeminiGetState: 'gemini:get-state',
+  GeminiSubmit: 'gemini:submit',
+  GeminiAttachFromScreen: 'gemini:attach-from-screen',
+  GeminiRemoveAttachment: 'gemini:remove-attachment',
+  GeminiNewChat: 'gemini:new-chat',
+  GeminiClose: 'gemini:close',
+  WidgetSetIgnoreMouse: 'widget:set-ignore-mouse',
+  GeminiStatus: 'gemini:status',
+  GeminiChunk: 'gemini:chunk',
+  GeminiDone: 'gemini:done',
+  GeminiError: 'gemini:error',
+  GeminiAttachmentChanged: 'gemini:attachment-changed',
+  SettingsGetAll: 'settings:get-all',
+  SettingsSetHotkeys: 'settings:set-hotkeys',
+  SettingsSetStartup: 'settings:set-startup',
+  SettingsCheckLogin: 'settings:check-login',
+  SettingsOpenLogin: 'settings:open-login',
+  SettingsCheckUpdates: 'settings:check-updates',
+  SettingsOpenHistory: 'settings:open-history',
+  LoginChanged: 'login:changed',
+  AppOpenExternal: 'app:open-external',
+  WindowClose: 'window:close',
+  WindowMinimize: 'window:minimize'
+} as const
 
 function subscribe<T>(channel: string, callback: Listener<T>): () => void {
   const listener = (_event: Electron.IpcRendererEvent, payload: T): void => callback(payload)
@@ -16,6 +53,8 @@ const api = {
   /** Circle to Search selection overlay. */
   circle: {
     getCapture: () => ipcRenderer.invoke(IPC.CircleGetCapture),
+    /** Tell the main process this overlay painted and is interactive. */
+    ready: () => ipcRenderer.send(IPC.CircleReady),
     selectFinished: (dataUrl: string) => ipcRenderer.invoke(IPC.CircleSelected, dataUrl),
     cancel: () => ipcRenderer.invoke(IPC.CircleCancel),
     dismissAll: () => ipcRenderer.invoke(IPC.CircleDismissAll),
@@ -39,10 +78,20 @@ const api = {
     onAttachment: (cb: Listener<unknown>) => subscribe(IPC.GeminiAttachmentChanged, cb)
   },
 
+  /**
+   * Click-through control for the transparent palette window: while true the
+   * window ignores mouse events entirely (desktop clicks pass through) but
+   * still receives forwarded hover moves so the renderer can flip it back.
+   */
+  widget: {
+    setIgnoreMouse: (ignore: boolean) => ipcRenderer.invoke(IPC.WidgetSetIgnoreMouse, ignore)
+  },
+
   /** Settings window. */
   settings: {
     getAll: () => ipcRenderer.invoke(IPC.SettingsGetAll),
-    setHotkeys: (hotkeys: Hotkeys) => ipcRenderer.invoke(IPC.SettingsSetHotkeys, hotkeys),
+    setHotkeys: (hotkeys: { circleToSearch: string; holdToGemini: string }) =>
+      ipcRenderer.invoke(IPC.SettingsSetHotkeys, hotkeys),
     setStartup: (enabled: boolean) => ipcRenderer.invoke(IPC.SettingsSetStartup, enabled),
     checkLogin: () => ipcRenderer.invoke(IPC.SettingsCheckLogin),
     openLogin: () => ipcRenderer.invoke(IPC.SettingsOpenLogin),

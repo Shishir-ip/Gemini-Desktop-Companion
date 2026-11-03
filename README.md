@@ -97,9 +97,11 @@ No API keys. No daemons phoning home. Just your Google session and a beautiful o
 
 ### Install (release build)
 
-1. Grab **`Gemini-Desktop-Companion-Setup-1.0.0.exe`** from the [latest release](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases).
+1. Grab **`Gemini-Desktop-Companion-Setup-1.0.1.exe`** from the [latest release](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases).
 2. Run the installer (choose per-user install; desktop + Start Menu shortcuts are created).
-3. The app starts in your **system tray**. Right-click the sparkle icon → **Settings** → sign in with Google. Done.
+3. Launch it — **the Gemini palette appears right away**, and a toast tells you the ✨ sparkle now lives in your system tray (check the `^` overflow). Sign in via **Settings → Google Account** and you're done.
+
+> Launching the app again at any time re-opens the palette. Boot launches (via the *Launch at Windows startup* toggle) stay silent in the tray.
 
 > Windows SmartScreen may warn about the unsigned installer — click *More info → Run anyway*. Build it from source yourself if you prefer (below).
 
@@ -194,6 +196,20 @@ If Google ever expires the session, the status dot turns red — click **Sign in
 3. Responses settle automatically (1.4 s debounce) with a 2-minute safety timeout.
 
 ## 🛠 Troubleshooting & FAQ
+
+<details>
+<summary><b>Nothing appears when I open the app (v1.0.0)</b></summary>
+
+v1.0.0 had a packaging bug where every window loaded an empty page — invisible fullscreen overlays could even block mouse input (fixed in **v1.0.1**: windows that fail to render are destroyed automatically, <kbd>Esc</kbd> is enforced at the app level, and manual launches now always show the palette). If you're on v1.0.0, please update.
+
+From v1.0.1 on, a file log is written to `%APPDATA%\Gemini Desktop Companion\logs\main.log` — attach it when reporting issues.
+</details>
+
+<details>
+<summary><b>An overlay seems stuck / screen feels frozen</b></summary>
+
+<kbd>Esc</kbd> always dismisses the Circle-to-Search freeze, the Gemini palette, and the Lens panel — this is enforced in the app's main process, so it works even if a page failed to render. Clicking anywhere on the frozen screen while Lens results are open also dismisses everything.
+</details>
 
 <details>
 <summary><b>Google says "This browser or app may not be secure"</b></summary>

@@ -5,6 +5,7 @@ import type { AppSettings, Hotkeys } from '../shared/types'
 export type StoreSchema = {
   hotkeys: Hotkeys
   launchAtStartup: boolean
+  welcomed: boolean
 }
 
 export const DEFAULT_HOTKEYS: Hotkeys = {
@@ -15,7 +16,8 @@ export const DEFAULT_HOTKEYS: Hotkeys = {
 export const store = new Store<StoreSchema>({
   defaults: {
     hotkeys: DEFAULT_HOTKEYS,
-    launchAtStartup: true
+    launchAtStartup: true,
+    welcomed: false
   }
 })
 

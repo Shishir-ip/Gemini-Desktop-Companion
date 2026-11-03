@@ -4,6 +4,7 @@ import path from 'node:path'
 import { searchLens } from '../gemini/lens'
 import { animateWindowBounds } from '../animate'
 import { loadRendererPage, preloadPath } from '../paths'
+import { log } from '../logger'
 
 let panel: BrowserWindow | null = null
 let lastCrop: string | null = null
@@ -62,6 +63,15 @@ export function openLensPanel(display: Display, dataUrl: string): void {
       void import('./overlay').then(({ closeAllSearchUI }) => closeAllSearchUI())
     }
   })
+  panel.webContents.on('did-fail-load', (_event, code, desc, _url, isMainFrame) => {
+    if (!isMainFrame) return
+    log(`[lens] panel shell load failed (${code} ${desc}) — closing search UI`)
+    void import('./overlay').then(({ closeAllSearchUI }) => closeAllSearchUI())
+  })
+  panel.webContents.on('render-process-gone', (_event, details) => {
+    log(`[lens] panel renderer gone (${details.reason}) — closing search UI`)
+    void import('./overlay').then(({ closeAllSearchUI }) => closeAllSearchUI())
+  })
   panel.webContents.on('did-finish-load', () => {
     setTimeout(() => {
       if (panel && !panel.isDestroyed() && panel.webContents.getURL().includes('google.')) {
@@ -90,7 +100,7 @@ async function uploadAndNavigate(dataUrl: string): Promise<void> {
     await panel.loadURL(result.url).catch(() => {
       /* navigation errors are non-fatal — the page still renders */
     })
-  } else if (panel.webContents.getURL().includes('lensError.html')) {
+  } else if (panel.webContents.getURL().includes('lensError')) {
     panel.webContents.send('lens:error', { code: result.error })
   }
 }

@@ -40,6 +40,11 @@ async function init(): Promise<void> {
     img.src = capture.dataUrl
   })
 
+  // Paint one frame, then tell the main process we're alive and interactive
+  // (clears its dead-renderer watchdog).
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  window.gdc.circle.ready()
+
   window.gdc.circle.onSetLensMode(() => {
     lensMode = true
     document.body.classList.add('lens-mode')
@@ -52,10 +57,12 @@ async function init(): Promise<void> {
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     e.preventDefault()
-    if (lensMode) {
-      void window.gdc.circle.dismissAll()
-    } else {
+    if (dragging) {
+      // Mid-drag: abandon the current selection but keep the overlay up.
       resetSelection()
+    } else {
+      // Spec: Esc dismisses the whole Circle to Search experience instantly.
+      void window.gdc.circle.dismissAll()
     }
   }
 })

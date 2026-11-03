@@ -2,6 +2,7 @@ import { BrowserWindow, session as electronSession } from 'electron'
 import { EventEmitter } from 'node:events'
 import type { LoginState } from '../../shared/types'
 import { chromeUserAgent, delay, preloadPath } from '../paths'
+import { log } from '../logger'
 
 const GEMINI_URL = 'https://gemini.google.com/app'
 
@@ -149,6 +150,11 @@ export class GeminiSession extends EventEmitter {
       }
     })
     this.win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    this.win.webContents.on('render-process-gone', (_event, details) => {
+      log(`[gemini] session renderer gone (${details.reason}) — resetting hidden window`)
+      this.win = null
+      this.loading = null
+    })
     this.win.on('closed', () => {
       this.win = null
       this.loading = null
@@ -290,6 +296,7 @@ export class GeminiSession extends EventEmitter {
   handleStream(full: string, settled: boolean): void {
     if (!this.active) return
     if (full.length > this.streamText.length) {
+      if (this.streamText.length === 0) log('[gemini] response streaming started')
       const delta = full.slice(this.streamText.length)
       this.streamText = full
       this.emit('chunk', { append: delta, full })
@@ -308,6 +315,7 @@ export class GeminiSession extends EventEmitter {
     if (!this.active) return
     this.active = false
     this.clearTimers()
+    log(`[gemini] response complete (${this.streamText.length} chars)`)
     this.emit('done', { full: this.streamText })
   }
 
@@ -315,6 +323,7 @@ export class GeminiSession extends EventEmitter {
     if (!this.active) return
     this.active = false
     this.clearTimers()
+    log(`[gemini] failed: ${code}`)
     this.emit('error', { code, message, needsLogin })
   }
 

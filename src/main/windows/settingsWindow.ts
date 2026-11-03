@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron'
 import { IPC } from '../../shared/ipc'
 import { loadRendererPage, preloadPath } from '../paths'
 import { getGeminiSession } from '../gemini/session'
+import { log } from '../logger'
 
 let settings: BrowserWindow | null = null
 let login: BrowserWindow | null = null
@@ -33,6 +34,18 @@ export function openSettings(): void {
     }
   })
   settings.setAlwaysOnTop(true, 'screen-saver')
+  // Safety: never leave a dead/invisible settings window around.
+  settings.webContents.on('did-fail-load', (_event, code, desc, _url, isMainFrame) => {
+    if (!isMainFrame) return
+    log(`[settings] load failed (${code} ${desc}) — destroying window`)
+    if (settings && !settings.isDestroyed()) settings.destroy()
+    settings = null
+  })
+  settings.webContents.on('render-process-gone', (_event, details) => {
+    log(`[settings] renderer gone (${details.reason}) — destroying window`)
+    if (settings && !settings.isDestroyed()) settings.destroy()
+    settings = null
+  })
   settings.on('close', (e) => {
     // Hide instead of quitting the tray app.
     if (!(process as NodeJS.Process & { gdcQuitting?: boolean }).gdcQuitting) {

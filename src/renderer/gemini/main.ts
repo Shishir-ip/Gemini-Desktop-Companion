@@ -172,8 +172,29 @@ errorRetry.addEventListener('click', () => {
 errorSignin.addEventListener('click', () => void window.gdc.settings.openLogin())
 
 // Click on the empty area around the sheet closes the widget (iOS behavior).
+// NOTE: the window is OS-level click-through outside the glass cards, so
+// this only fires in the narrow gap between the two cards.
 wrap.addEventListener('pointerdown', (e) => {
   if (e.target === wrap) close()
+})
+
+/* ── Click-through: invisible regions must never block the desktop ─────── */
+let ignoringMouse = true
+
+function applyIgnoreMouse(ignore: boolean): void {
+  if (ignore === ignoringMouse) return
+  ignoringMouse = ignore
+  void window.gdc.widget.setIgnoreMouse(ignore)
+}
+
+document.addEventListener('pointermove', (e) => {
+  const el = e.target as Element | null
+  const overCard = !!(el && typeof el.closest === 'function' && el.closest('.glass-card'))
+  applyIgnoreMouse(!overCard)
+})
+// When the pointer leaves the window entirely, go back to click-through.
+document.addEventListener('pointerout', (e) => {
+  if (!e.relatedTarget) applyIgnoreMouse(true)
 })
 
 window.addEventListener('keydown', (e) => {

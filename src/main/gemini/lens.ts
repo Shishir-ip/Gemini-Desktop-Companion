@@ -17,7 +17,8 @@ export async function searchLens(dataUrl: string): Promise<LensResult> {
     form.append('hl', 'en')
     const res = await net.fetch('https://lens.google.com/upload', {
       method: 'POST',
-      body: form
+      body: form,
+      signal: AbortSignal.timeout(20_000)
     })
     if (res.ok) {
       const html = await res.text()
@@ -35,7 +36,8 @@ export async function searchLens(dataUrl: string): Promise<LensResult> {
     const res = await net.fetch('https://www.google.com/searchbyimage/upload', {
       method: 'POST',
       body: form,
-      redirect: 'follow'
+      redirect: 'follow',
+      signal: AbortSignal.timeout(20_000)
     })
     if (res.ok && /^https:\/\/(www\.)?google\./.test(res.url)) {
       return { ok: true, url: res.url }
