@@ -39,6 +39,8 @@ const IPC = {
   SettingsOpenHistory: 'settings:open-history',
   LoginChanged: 'login:changed',
   AppOpenExternal: 'app:open-external',
+  AppStartCircle: 'app:start-circle',
+  AppShowWidget: 'app:show-widget',
   WindowClose: 'window:close',
   WindowMinimize: 'window:minimize'
 } as const
@@ -111,6 +113,10 @@ const api = {
   },
 
   /** Generic helpers available to every window. */
+  app: {
+    startCircleToSearch: () => ipcRenderer.invoke(IPC.AppStartCircle),
+    showGemini: () => ipcRenderer.invoke(IPC.AppShowWidget)
+  },
   win: {
     close: () => ipcRenderer.invoke(IPC.WindowClose),
     minimize: () => ipcRenderer.invoke(IPC.WindowMinimize)

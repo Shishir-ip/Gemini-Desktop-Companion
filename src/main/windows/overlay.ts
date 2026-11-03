@@ -6,7 +6,8 @@ import { loadRendererPage, preloadPath } from '../paths'
 import { captureAllDisplays, type DisplayCapture } from '../screenshot'
 import { setPendingAttachment } from '../attachment'
 import { openLensPanel, closeLensPanel } from './lensPanel'
-import { showGeminiWidget } from './geminiWidget'
+import { hideGeminiWidget, showGeminiWidget } from './geminiWidget'
+import { hideSettings } from './settingsWindow'
 import { log } from '../logger'
 
 const overlays = new Map<number, BrowserWindow>()
@@ -42,6 +43,12 @@ export async function startCircleToSearch(m: CircleMode = 'lens'): Promise<void>
   mode = m
   lensModeActive = false
 
+  // Any floating glass window (palette, settings) sits at the same
+  // always-on-top level as the overlay and swallows clicks — including its
+  // large invisible interactive cards. Clear the stage first.
+  hideGeminiWidget()
+  hideSettings()
+
   try {
     captures = await captureAllDisplays()
   } catch (err) {
@@ -58,6 +65,7 @@ export async function startCircleToSearch(m: CircleMode = 'lens'): Promise<void>
     if (!display) continue
     createOverlay(display, displayId, capture)
   }
+  log(`[circle] overlays created (mode: ${m}, displays: ${captures.size})`)
 }
 
 function createOverlay(display: Display, displayId: number, capture: DisplayCapture): void {

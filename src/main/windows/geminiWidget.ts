@@ -137,7 +137,6 @@ export function setWidgetIgnoreMouse(ignore: boolean): void {
 export function isGeminiWidgetVisible(): boolean {
   return !!(widget && !widget.isDestroyed() && widget.isVisible())
 }
-
 /** Forward main-process session events into the widget renderer. */
 export function forwardGeminiEvent(channel: string, payload: unknown): void {
   if (widget && !widget.isDestroyed()) {

@@ -2,6 +2,7 @@ import { Menu, Tray, nativeImage, app } from 'electron'
 import { getAssetPath } from './paths'
 import { startCircleToSearch } from './windows/overlay'
 import { toggleGeminiWidget } from './windows/geminiWidget'
+import { openHome } from './windows/homeWindow'
 import { openSettings } from './windows/settingsWindow'
 import { checkForUpdates } from './updater'
 
@@ -13,6 +14,7 @@ export function createTray(): void {
   tray.setToolTip('Gemini Desktop Companion')
 
   const menu = Menu.buildFromTemplate([
+    { label: 'Home', click: () => openHome() },
     { label: 'Hold to Gemini', click: () => toggleGeminiWidget() },
     { label: 'Circle to Search', click: () => void startCircleToSearch('lens') },
     { type: 'separator' },
@@ -28,8 +30,8 @@ export function createTray(): void {
     }
   ])
 
-  // Left click toggles the Gemini widget; right click opens the menu.
-  tray.on('click', () => toggleGeminiWidget())
+  // Left click opens the Home interface; right click opens the menu.
+  tray.on('click', () => openHome())
   tray.on('right-click', () => tray?.popUpContextMenu(menu))
 }
 

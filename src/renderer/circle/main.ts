@@ -88,7 +88,11 @@ sel.addEventListener('pointerdown', (e) => {
   moved = false
   startX = e.clientX
   startY = e.clientY
-  sel.setPointerCapture(e.pointerId)
+  try {
+    sel.setPointerCapture(e.pointerId)
+  } catch {
+    /* pointer may already be gone */
+  }
   selBox.style.display = 'block'
   updateBox(e.clientX, e.clientY)
 })
@@ -98,6 +102,16 @@ sel.addEventListener('pointermove', (e) => {
   if (Math.abs(e.clientX - startX) > 6 || Math.abs(e.clientY - startY) > 6) moved = true
   updateBox(e.clientX, e.clientY)
 })
+
+// A cancelled pointer (gesture takeover, device switch) must not leave a
+// half-dead drag state behind.
+sel.addEventListener('pointercancel', () => {
+  dragging = false
+  resetSelection()
+})
+
+// Right-click must never open a menu over the frozen screen.
+window.addEventListener('contextmenu', (e) => e.preventDefault())
 
 sel.addEventListener('pointerup', (e) => {
   if (!dragging) return

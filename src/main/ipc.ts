@@ -23,7 +23,8 @@ import {
   forwardGeminiEvent,
   setWidgetIgnoreMouse
 } from './windows/geminiWidget'
-import { openLoginWindow, openGeminiVisible, openSettings, pushLoginChanged } from './windows/settingsWindow'
+import { openGeminiVisible, openSettings, pushLoginChanged } from './windows/settingsWindow'
+import { openLoginWindow } from './auth/browserSignIn'
 import { log } from './logger'
 
 /**
@@ -126,6 +127,8 @@ export function registerIpc(): void {
 
   // ── Generic window helpers ───────────────────────────────────────────
   ipcMain.handle(IPC.AppOpenExternal, (_event, url: string) => openExternalUrl(url))
+  ipcMain.handle(IPC.AppStartCircle, () => void startCircleToSearch('lens'))
+  ipcMain.handle(IPC.AppShowWidget, () => showGeminiWidget())
   ipcMain.handle(IPC.WindowClose, (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close()
   })

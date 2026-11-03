@@ -101,11 +101,11 @@ No API keys. No daemons phoning home. Just your Google session and a beautiful o
 
 ### Install (release build)
 
-1. Grab **`Gemini-Desktop-Companion-Setup-1.0.1.exe`** from the [latest release](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases).
-2. Run the installer (choose per-user install; desktop + Start Menu shortcuts are created).
-3. Launch it — **the Gemini palette appears right away**, and a toast tells you the ✨ sparkle now lives in your system tray (check the `^` overflow). Sign in via **Settings → Google Account** and you're done.
+1. Grab **`Gemini-Desktop-Companion-Setup-1.1.0.exe`** from the [latest release](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases).
+2. Run the installer (per-user; desktop + Start Menu shortcuts included).
+3. Launch it — the **Home window opens** and walks you through everything: both features, their shortcuts, and the account status. Sign in, press *Try it now*, and you're off.
 
-> Launching the app again at any time re-opens the palette. Boot launches (via the *Launch at Windows startup* toggle) stay silent in the tray.
+> Launching again or clicking the ✨ tray icon re-opens Home. Hotkeys work from anywhere, always.
 
 > Windows SmartScreen may warn about the unsigned installer — click *More info → Run anyway*. Build it from source yourself if you prefer (below).
 
@@ -138,13 +138,13 @@ The artifact lands at `release/<version>/Gemini-Desktop-Companion-Setup-<version
 
 ## 🔐 Google Login & History
 
-Signing in is **required** for the palette to send prompts — signed-out Gemini is heavily rate-limited and saves no history:
+Sign-in runs in **your real browser** (Edge/Chrome) — Google never shows the *"This browser or app may not be secure"* wall because there's no embedded browser at all:
 
-1. On first launch (or whenever you're signed out) the palette shows a **Sign in** banner, and the sign-in window opens automatically. You can also use **Settings → Google Account**, the ⚙️ gear in the palette, or the red status dot.
-2. A browser-style window opens on `gemini.google.com` — sign in with your Google account. **The window closes itself the moment sign-in succeeds.**
-3. Cookies persist in an isolated Chromium partition, so **you only ever log in once**. Every prompt — typed or screenshot-attached — runs in your real Gemini session and is **saved to your account history** at [gemini.google.com/app](https://gemini.google.com/app). The 🕘 button opens it instantly.
+1. Click **Sign in with your browser** (Home window, Settings → Google Account, or the palette's banner).
+2. A clean Edge/Chrome window opens on the Google sign-in page. Sign in exactly like you always do.
+3. The moment the session is live, the app imports it securely, the browser window closes itself, and the status turns green. From then on, **every chat — typed or screenshot-attached — is saved to your Gemini history** at [gemini.google.com/app](https://gemini.google.com/app). The 🕘 button opens it instantly.
 
-If Google ever expires the session, the status dot turns red and the banner returns — click **Sign in** again.
+If Google ever expires the session, the status turns red and the banner returns — click **Sign in** again.
 
 ## 📁 Project Structure
 

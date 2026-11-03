@@ -39,6 +39,8 @@ export const IPC = {
 
   // ── Generic ─────────────────────────────────────────────────────────────
   AppOpenExternal: 'app:open-external',
+  AppStartCircle: 'app:start-circle',
+  AppShowWidget: 'app:show-widget',
   WindowClose: 'window:close',
   WindowMinimize: 'window:minimize',
 

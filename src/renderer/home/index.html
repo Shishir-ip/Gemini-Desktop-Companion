@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'"
+    />
+    <title>Gemini Desktop Companion</title>
+    <link rel="stylesheet" href="../shared/glass.css" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="panel" class="glass-card anim-fade-up">
+      <header id="titlebar">
+        <div class="tb-title">
+          <img src="/icon.png" alt="" class="tb-logo" draggable="false" />
+          <span>Gemini Desktop Companion</span>
+          <span id="version-badge" class="version-badge"></span>
+        </div>
+        <div class="tb-actions">
+          <button id="btn-settings" class="icon-btn" title="Settings (Ctrl+,)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          <button id="btn-minimize" class="icon-btn" title="Minimize">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>
+          </button>
+          <button id="btn-close" class="icon-btn" title="Hide (Esc)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <main id="content">
+        <!-- Account -->
+        <section id="account-card">
+          <span id="account-dot" class="login-dot unknown"></span>
+          <div class="account-text">
+            <span id="account-title">Checking Google session…</span>
+            <span id="account-sub">Chats save to your Gemini account history.</span>
+          </div>
+          <button id="btn-signin" class="glass-btn glass-btn-primary">Sign in with your browser</button>
+        </section>
+
+        <!-- Features -->
+        <section class="features">
+          <div class="feature-card">
+            <div class="feature-head">
+              <span class="feature-icon lens">⌖</span>
+              <h3>Circle to Search</h3>
+              <span class="kbd-chip"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></span>
+            </div>
+            <p>
+              Freeze your entire screen, drag a box around anything — text, an image, an error —
+              and Google Lens results slide out from the right with read-aloud buttons.
+            </p>
+            <ol class="steps">
+              <li>Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> — the screen freezes and dims</li>
+              <li><strong>Click and drag</strong> a rectangle around what you want to search <span class="muted">(or just click to search the whole screen)</span></li>
+              <li>Results open on the right — click 🔊 to hear any text read aloud</li>
+              <li><kbd>Esc</kbd> or a click on the frozen screen closes everything</li>
+            </ol>
+            <button id="try-circle" class="glass-btn">Try it now</button>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-head">
+              <span class="feature-icon gem">✦</span>
+              <h3>Hold to Gemini</h3>
+              <span class="kbd-chip"><kbd>Alt</kbd>+<kbd>Space</kbd></span>
+            </div>
+            <p>
+              A floating Gemini prompt, anywhere, anytime. Ask questions, attach a
+              screenshot of what's on screen, and watch the answer stream in live.
+            </p>
+            <ol class="steps">
+              <li>Press <kbd>Alt</kbd>+<kbd>Space</kbd> — the Gemini palette slides up</li>
+              <li>Type your question, then press <kbd>Enter</kbd></li>
+              <li>Want Gemini to see your screen? Click 📎 and select a region first</li>
+              <li><kbd>Alt</kbd>+<kbd>Space</kbd> or <kbd>Esc</kbd> hides it — chats stay in your Google history</li>
+            </ol>
+            <button id="try-gemini" class="glass-btn">Try it now</button>
+          </div>
+        </section>
+
+        <!-- Basics -->
+        <section class="basics">
+          <div class="basic-row">
+            <span class="basic-icon">✨</span>
+            <span><strong>System tray:</strong> look for the sparkle near the clock (check the <kbd>^</kbd> overflow). Right-click it for Settings, updates and Quit.</span>
+          </div>
+          <div class="basic-row">
+            <span class="basic-icon">⌨</span>
+            <span><strong>Change shortcuts</strong> anytime in Settings — including <kbd>Ctrl</kbd>+<kbd>,</kbd> to open this window.</span>
+          </div>
+          <div class="basic-row">
+            <span class="basic-icon">🔐</span>
+            <span><strong>Sign-in happens in your real browser</strong> (Edge/Chrome) — Google never blocks it, and the app picks the session up automatically.</span>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

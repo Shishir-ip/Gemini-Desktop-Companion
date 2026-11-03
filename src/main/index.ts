@@ -6,7 +6,8 @@ import { registerAllHotkeys, registrationStatus } from './shortcuts'
 import { applyLaunchAtStartup } from './startup'
 import { startCircleToSearch } from './windows/overlay'
 import { showGeminiWidget } from './windows/geminiWidget'
-import { openSettings, openLoginWindow } from './windows/settingsWindow'
+import { openSettings } from './windows/settingsWindow'
+import { openHome } from './windows/homeWindow'
 import { store } from './store'
 import { initLogger, log } from './logger'
 
@@ -29,8 +30,8 @@ if (!app.requestSingleInstanceLock()) {
   const manualLaunch = !process.argv.includes('--hidden')
 
   app.on('second-instance', () => {
-    log('[app] second instance launched — showing widget')
-    showGeminiWidget()
+    log('[app] second instance launched — showing home')
+    openHome()
   })
 
   app.whenReady().then(() => {
@@ -62,43 +63,28 @@ if (!app.requestSingleInstanceLock()) {
       void getGeminiSession().preload()
     }, 3000)
 
-    // Diagnostic opener: `--gdc-open=circle|widget|settings` shows a page
-    // right after startup (used by scripts/verify-ui.mjs and support).
+    // Diagnostic opener: `--gdc-open=circle|widget|settings|home` shows a
+    // page right after startup (used by scripts/verify-ui.mjs and support).
     const openArg = process.argv.find((a) => a.startsWith('--gdc-open='))
     if (openArg) {
-      const page = openArg.split('=')[1] ?? 'widget'
+      const page = openArg.split('=')[1] ?? 'home'
       log(`[debug] --gdc-open=${page}`)
       setTimeout(() => {
         if (page === 'circle') void startCircleToSearch('lens')
+        else if (page === 'widget') showGeminiWidget()
         else if (page === 'settings') openSettings()
-        else showGeminiWidget()
+        else openHome()
       }, 1500)
     } else if (manualLaunch) {
-      const firstRun = !store.get('welcomed')
-      showGeminiWidget()
-      if (firstRun) {
-        // First launch: surface the actual UI — settings with the account
-        // card is the natural "home screen" for a tray app like this.
+      // Always land on the Home interface: it explains the features, the
+      // shortcuts and the account status — nothing is hidden in the tray.
+      openHome()
+      if (!store.get('welcomed')) {
         store.set('welcomed', true)
-        const hk = store.get('hotkeys').holdToGemini
         notifyTray(
           'Gemini Desktop Companion is running',
-          `Look for the ✨ sparkle in your system tray (check the ^ overflow). ` +
-            `Press ${hk} anywhere to ask Gemini, ${store.get('hotkeys').circleToSearch} for Circle to Search.`
+          'The Home window explains everything — shortcuts, sign-in and both features. Find the ✨ sparkle in your tray anytime.'
         )
-        setTimeout(() => openSettings(), 400)
-      } else if (!process.argv.includes('--gdc-open=')) {
-        // Returning user: if they're signed out, bring the sign-in window up
-        // front — signed-out Gemini is rate-limited and saves no history.
-        setTimeout(() => {
-          void (async () => {
-            const state = await getGeminiSession().refreshLoginState()
-            if (!state.loggedIn && !state.unknown) {
-              log('[app] signed out on launch — opening sign-in window')
-              await openLoginWindow()
-            }
-          })()
-        }, 6000)
       }
     }
   })

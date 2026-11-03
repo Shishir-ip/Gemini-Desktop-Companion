@@ -93,10 +93,16 @@ body.lens-mode #lens-hint {
 }
 
 #sel {
+  display: block; /* never hidden — it is the hit surface for the whole screen */
   position: fixed;
   inset: 0;
   z-index: 2;
   cursor: crosshair;
+  /* Required for pointer dragging on touch/pen devices — without it the
+     browser cancels the pointer for pan gestures and drawing silently dies. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 body.lens-mode #sel {
   cursor: default;
