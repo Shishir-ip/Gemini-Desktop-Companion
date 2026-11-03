@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; script-src 'self'"
+    />
+    <title>Hold to Gemini</title>
+    <link rel="stylesheet" href="../shared/glass.css" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="wrap">
+      <!-- Response card -->
+      <section id="response-card" class="glass-card" hidden>
+        <div id="thinking" class="thinking-row" hidden>
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span id="thinking-detail">Thinking…</span>
+        </div>
+        <div id="stream" tabindex="0"></div>
+        <div id="error-box" hidden>
+          <div id="error-title">Something went wrong</div>
+          <div id="error-message"></div>
+          <div class="error-actions">
+            <button id="error-signin" class="glass-btn glass-btn-primary" hidden>
+              Sign in with Google
+            </button>
+            <button id="error-retry" class="glass-btn">Retry</button>
+          </div>
+        </div>
+        <div id="response-footer" hidden>
+          <button id="btn-newchat" class="glass-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            New chat
+          </button>
+          <button id="btn-copy" class="glass-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            Copy
+          </button>
+          <span id="stream-cursor"></span>
+        </div>
+      </section>
+
+      <!-- Input card -->
+      <section id="input-card" class="glass-card anim-fade-up">
+        <div class="header-row">
+          <img src="/icon.png" alt="" class="logo" draggable="false" />
+          <span class="title">Gemini</span>
+          <span id="login-dot" class="login-dot unknown" title="Checking Google session…"></span>
+          <span class="spacer"></span>
+          <button id="btn-history" class="icon-btn" title="Open Gemini history (full session)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/><path d="M12 7v5l3.5 2"/></svg>
+          </button>
+          <button id="btn-attach" class="icon-btn" title="Attach a screen selection">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <button id="btn-close" class="icon-btn" title="Close (Esc)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div id="attachment-chip" hidden>
+          <img id="attachment-thumb" alt="Attached screenshot" draggable="false" />
+          <div class="attachment-meta">
+            <span class="attachment-name">Screen selection</span>
+            <span id="attachment-size" class="text-tertiary"></span>
+          </div>
+          <button id="btn-remove-attachment" class="icon-btn small" title="Remove attachment">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="input-row">
+          <textarea
+            id="prompt"
+            rows="1"
+            placeholder="Ask Gemini anything…"
+            spellcheck="false"
+          ></textarea>
+          <button id="btn-send" class="send-btn" title="Send (Enter)" disabled>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+          </button>
+        </div>
+
+        <div class="footer-row">
+          <span class="text-tertiary">Chats save to your Google account history</span>
+          <span class="footer-hint">
+            <kbd>Enter</kbd> send · <kbd>Shift</kbd>+<kbd>Enter</kbd> newline
+          </span>
+        </div>
+      </section>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

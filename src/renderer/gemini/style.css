@@ -1,0 +1,317 @@
+/* Floating Gemini command palette — iOS bottom-sheet aesthetic */
+
+#wrap {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 16px 20px 20px;
+  gap: 10px;
+}
+
+body.closing #response-card,
+body.closing #input-card {
+  opacity: 0;
+  transform: translateY(20px) scale(0.98);
+  transition: opacity 150ms ease, transform 150ms var(--ease-ios);
+}
+
+#response-card,
+#input-card {
+  width: 100%;
+  max-width: 720px;
+}
+
+/* ── Response card ─────────────────────────────────────────────────────── */
+#response-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px 14px;
+  overflow: hidden;
+}
+#response-card[hidden] {
+  display: none;
+}
+
+.thinking-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 2px 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.thinking-row .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7ea6ff, #b678f8);
+  animation: gdc-pulse 1.1s ease-in-out infinite;
+}
+.thinking-row .dot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.thinking-row .dot:nth-child(3) {
+  animation-delay: 0.36s;
+}
+#thinking-detail {
+  margin-left: 7px;
+  color: var(--text-secondary);
+}
+
+#stream {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  font-size: 14.5px;
+  line-height: 1.62;
+  color: var(--text-primary);
+  user-select: text;
+  cursor: text;
+  white-space: normal;
+  padding-right: 6px;
+}
+#stream h3 {
+  font-size: 14.5px;
+  font-weight: 650;
+  margin: 14px 0 6px;
+  color: #cfe0ff;
+}
+#stream ul,
+#stream ol {
+  margin: 6px 0;
+  padding-left: 22px;
+}
+#stream li {
+  margin: 3px 0;
+}
+#stream strong {
+  font-weight: 650;
+  color: #fff;
+}
+#stream a {
+  color: #8ab4ff;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(138, 180, 255, 0.35);
+  cursor: pointer;
+}
+#stream code {
+  font-family: 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  font-size: 12.5px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+#stream pre.code {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 10px 0;
+  user-select: text;
+}
+#stream pre.code code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+#error-box {
+  padding: 4px 2px 6px;
+}
+#error-title {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--danger);
+  margin-bottom: 4px;
+}
+#error-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+.error-actions {
+  display: flex;
+  gap: 8px;
+}
+
+#response-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+#response-footer[hidden] {
+  display: none;
+}
+#stream-cursor {
+  width: 8px;
+  height: 16px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #7ea6ff, #b678f8);
+  animation: gdc-pulse 0.9s ease-in-out infinite;
+  margin-left: auto;
+}
+#stream-cursor[hidden] {
+  display: none;
+}
+
+/* ── Input card ────────────────────────────────────────────────────────── */
+#input-card {
+  flex: 0 0 auto;
+  padding: 14px 16px 10px;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 10px;
+}
+.logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  box-shadow: 0 2px 8px rgba(126, 166, 255, 0.4);
+}
+.title {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+.login-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+.login-dot.ok {
+  background: var(--success);
+  box-shadow: 0 0 8px rgba(48, 209, 88, 0.7);
+}
+.login-dot.unknown {
+  background: var(--warning);
+  box-shadow: 0 0 8px rgba(255, 214, 10, 0.6);
+}
+.login-dot.off {
+  background: var(--danger);
+  box-shadow: 0 0 8px rgba(255, 69, 58, 0.6);
+}
+.spacer {
+  flex: 1;
+}
+
+#attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+#attachment-chip[hidden] {
+  display: none;
+}
+#attachment-thumb {
+  width: 54px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.attachment-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.attachment-name {
+  font-size: 12.5px;
+  font-weight: 550;
+}
+#attachment-size {
+  font-size: 11px;
+}
+.icon-btn.small {
+  width: 24px;
+  height: 24px;
+}
+
+.input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+#prompt {
+  flex: 1;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+  max-height: 130px;
+  padding: 6px 2px;
+  user-select: text;
+  cursor: text;
+}
+#prompt::placeholder {
+  color: var(--text-tertiary);
+}
+
+.send-btn {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, #4f8cff 0%, #a855f7 100%);
+  box-shadow: 0 4px 16px rgba(109, 158, 255, 0.4);
+  cursor: pointer;
+  transition: transform 200ms var(--ease-ios), opacity 200ms var(--ease-ios),
+    box-shadow 200ms var(--ease-ios);
+}
+.send-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  box-shadow: none;
+}
+.send-btn:not(:disabled):hover {
+  transform: scale(1.06);
+}
+.send-btn:not(:disabled):active {
+  transform: scale(0.94);
+}
+
+.footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 9px;
+  font-size: 11px;
+}
+.footer-hint kbd {
+  font-family: inherit;
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+}

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'"
+    />
+    <title>Settings — Gemini Desktop Companion</title>
+    <link rel="stylesheet" href="../shared/glass.css" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="panel" class="glass-card anim-fade-up">
+      <!-- Custom title bar -->
+      <header id="titlebar">
+        <div class="tb-title">
+          <img src="/icon.png" alt="" class="tb-logo" draggable="false" />
+          <span>Gemini Desktop Companion</span>
+          <span id="version-badge" class="version-badge">v1.0.0</span>
+        </div>
+        <div class="tb-actions">
+          <button id="btn-minimize" class="tb-btn" title="Minimize">
+            <svg width="12" height="12" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>
+          </button>
+          <button id="btn-close" class="tb-btn tb-close" title="Close">
+            <svg width="12" height="12" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <main id="content">
+        <!-- Shortcuts -->
+        <section>
+          <h2 class="section-title">Shortcuts</h2>
+          <div class="group">
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Circle to Search</span>
+                <span class="row-sub">Freeze the screen and select anything to search with Google Lens</span>
+              </div>
+              <div class="hotkey-cell">
+                <button id="hk-circle" class="hotkey-recorder" data-target="circleToSearch">Ctrl + Shift + C</button>
+                <span id="hk-circle-status" class="hotkey-status" title=""></span>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Hold to Gemini</span>
+                <span class="row-sub">Open the floating Gemini prompt from anywhere</span>
+              </div>
+              <div class="hotkey-cell">
+                <button id="hk-gemini" class="hotkey-recorder" data-target="holdToGemini">Alt + Space</button>
+                <span id="hk-gemini-status" class="hotkey-status" title=""></span>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Open Settings</span>
+                <span class="row-sub">Fixed shortcut</span>
+              </div>
+              <span class="hotkey-static">Ctrl + ,</span>
+            </div>
+          </div>
+          <p id="hotkey-note" class="note" hidden></p>
+        </section>
+
+        <!-- General -->
+        <section>
+          <h2 class="section-title">General</h2>
+          <div class="group">
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Launch at Windows startup</span>
+                <span class="row-sub">Start minimized to the system tray when you sign in</span>
+              </div>
+              <div id="toggle-startup" class="ios-toggle" role="switch" aria-checked="false" tabindex="0"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Account -->
+        <section>
+          <h2 class="section-title">Google Account</h2>
+          <div class="group">
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title" id="account-title">Checking session…</span>
+                <span class="row-sub" id="account-sub">Your Gemini chats are saved to your account history.</span>
+              </div>
+              <button id="btn-login" class="glass-btn glass-btn-primary">Sign in</button>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Gemini history</span>
+                <span class="row-sub">Open your full conversation history in the in-app session</span>
+              </div>
+              <button id="btn-history" class="glass-btn">Open</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- About -->
+        <section>
+          <h2 class="section-title">About</h2>
+          <div class="group">
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Check for updates</span>
+                <span class="row-sub" id="update-sub">You're on the latest release channel</span>
+              </div>
+              <button id="btn-updates" class="glass-btn">Check</button>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Project on GitHub</span>
+                <span class="row-sub">Star the repo, file issues, read the source</span>
+              </div>
+              <button id="btn-github" class="glass-btn">Open</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

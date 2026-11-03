@@ -1,0 +1,70 @@
+import { contextBridge, ipcRenderer } from 'electron'
+import { IPC } from '../shared/ipc'
+import type { Hotkeys } from '../shared/types'
+
+type Listener<T> = (payload: T) => void
+
+function subscribe<T>(channel: string, callback: Listener<T>): () => void {
+  const listener = (_event: Electron.IpcRendererEvent, payload: T): void => callback(payload)
+  ipcRenderer.on(channel, listener)
+  return () => {
+    ipcRenderer.off(channel, listener)
+  }
+}
+
+const api = {
+  /** Circle to Search selection overlay. */
+  circle: {
+    getCapture: () => ipcRenderer.invoke(IPC.CircleGetCapture),
+    selectFinished: (dataUrl: string) => ipcRenderer.invoke(IPC.CircleSelected, dataUrl),
+    cancel: () => ipcRenderer.invoke(IPC.CircleCancel),
+    dismissAll: () => ipcRenderer.invoke(IPC.CircleDismissAll),
+    outsideClick: () => ipcRenderer.invoke('circle:outside-click'),
+    onSetLensMode: (cb: Listener<void>) => subscribe(IPC.CircleSetLensMode, cb)
+  },
+
+  /** Floating Gemini command palette. */
+  gemini: {
+    getState: () => ipcRenderer.invoke(IPC.GeminiGetState),
+    submit: (text: string) => ipcRenderer.invoke(IPC.GeminiSubmit, text),
+    attachFromScreen: () => ipcRenderer.invoke(IPC.GeminiAttachFromScreen),
+    removeAttachment: () => ipcRenderer.invoke(IPC.GeminiRemoveAttachment),
+    newChat: () => ipcRenderer.invoke(IPC.GeminiNewChat),
+    close: () => ipcRenderer.invoke(IPC.GeminiClose),
+    openHistory: () => ipcRenderer.invoke(IPC.SettingsOpenHistory),
+    onStatus: (cb: Listener<unknown>) => subscribe(IPC.GeminiStatus, cb),
+    onChunk: (cb: Listener<unknown>) => subscribe(IPC.GeminiChunk, cb),
+    onDone: (cb: Listener<unknown>) => subscribe(IPC.GeminiDone, cb),
+    onError: (cb: Listener<unknown>) => subscribe(IPC.GeminiError, cb),
+    onAttachment: (cb: Listener<unknown>) => subscribe(IPC.GeminiAttachmentChanged, cb)
+  },
+
+  /** Settings window. */
+  settings: {
+    getAll: () => ipcRenderer.invoke(IPC.SettingsGetAll),
+    setHotkeys: (hotkeys: Hotkeys) => ipcRenderer.invoke(IPC.SettingsSetHotkeys, hotkeys),
+    setStartup: (enabled: boolean) => ipcRenderer.invoke(IPC.SettingsSetStartup, enabled),
+    checkLogin: () => ipcRenderer.invoke(IPC.SettingsCheckLogin),
+    openLogin: () => ipcRenderer.invoke(IPC.SettingsOpenLogin),
+    checkUpdates: () => ipcRenderer.invoke(IPC.SettingsCheckUpdates),
+    openHistory: () => ipcRenderer.invoke(IPC.SettingsOpenHistory),
+    onLoginChanged: (cb: Listener<unknown>) => subscribe(IPC.LoginChanged, cb)
+  },
+
+  /** Lens error panel actions. */
+  lens: {
+    retry: () => ipcRenderer.invoke(IPC.LensRetry),
+    onError: (cb: Listener<unknown>) => subscribe('lens:error', cb)
+  },
+
+  /** Generic helpers available to every window. */
+  win: {
+    close: () => ipcRenderer.invoke(IPC.WindowClose),
+    minimize: () => ipcRenderer.invoke(IPC.WindowMinimize)
+  },
+  openExternal: (url: string) => ipcRenderer.invoke(IPC.AppOpenExternal, url)
+}
+
+export type GdcApi = typeof api
+
+contextBridge.exposeInMainWorld('gdc', api)

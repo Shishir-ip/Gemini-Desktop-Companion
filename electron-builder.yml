@@ -1,0 +1,37 @@
+appId: com.shishir.geminidesktopcompanion
+productName: Gemini Desktop Companion
+copyright: Copyright © 2026 Shishir
+
+directories:
+  output: release/${version}
+  buildResources: build
+
+files:
+  - out/**
+
+asar: true
+
+extraResources:
+  - from: resources
+    to: resources
+    filter:
+      - "**/*"
+
+win:
+  icon: build/icon.ico
+  artifactName: Gemini-Desktop-Companion-Setup-${version}.${ext}
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Gemini Desktop Companion
+  deleteAppDataOnUninstall: false
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
