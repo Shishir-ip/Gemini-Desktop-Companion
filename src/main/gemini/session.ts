@@ -279,15 +279,17 @@ export class GeminiSession extends EventEmitter {
           return {
             ready: document.readyState === 'complete',
             onGemini: location.host === 'gemini.google.com',
+            sorry: location.pathname.startsWith('/sorry'),
             avatarImg: !!document.querySelector('img.gbii, img.gbs, img[alt*="profile" i]'),
             signInLink: !!document.querySelector('a[href*="accounts.google.com/ServiceLogin"], a[href*="accounts.google.com/v3/signin"], a[href*="ServiceLogin"]')
           }
         } catch (e) {
-          return { ready: false, onGemini: false, avatarImg: false, signInLink: false }
+          return { ready: false, onGemini: false, sorry: false, avatarImg: false, signInLink: false }
         }
       })()`)) as {
         ready: boolean
         onGemini: boolean
+        sorry: boolean
         avatarImg: boolean
         signInLink: boolean
       }
@@ -295,10 +297,12 @@ export class GeminiSession extends EventEmitter {
       const determined = state.onGemini && state.ready
       const previous = this.cachedLogin.loggedIn
       this.cachedLogin = {
-        loggedIn: determined ? state.avatarImg && !state.signInLink : false,
-        unknown: !determined
+        loggedIn: determined && !state.sorry ? state.avatarImg && !state.signInLink : false,
+        unknown: !determined || state.sorry
       }
-      if (this.cachedLogin.loggedIn && !previous && !this.cachedLogin.unknown) {
+      if (state.sorry) {
+        log('[gemini] Google served a verification page (/sorry) — treat session as undetermined')
+      } else if (this.cachedLogin.loggedIn && !previous && !this.cachedLogin.unknown) {
         log('[gemini] Google account signed in — reloading hidden session')
         void this.reload()
       } else if (determined && previous !== this.cachedLogin.loggedIn) {
@@ -319,9 +323,14 @@ export class GeminiSession extends EventEmitter {
   async reload(): Promise<void> {
     if (!this.win || this.win.isDestroyed()) return
     try {
-      await this.win.loadURL(GEMINI_URL)
-      await delay(1200)
-      await this.injectBridges()
+      // Never let a stalled network hang the sign-in finish path.
+      await Promise.race([
+        this.win.loadURL(GEMINI_URL).then(async () => {
+          await delay(1500)
+          await this.injectBridges()
+        }),
+        new Promise((r) => setTimeout(r, 30_000))
+      ])
     } catch (err) {
       log(`[gemini] reload failed: ${String(err)}`)
     }

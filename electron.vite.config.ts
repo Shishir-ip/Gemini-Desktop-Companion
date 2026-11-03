@@ -6,7 +6,10 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/main/index.ts') }
+        input: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          signinHelper: resolve(__dirname, 'src/main/auth/signinHelper.ts')
+        }
       }
     }
   },
