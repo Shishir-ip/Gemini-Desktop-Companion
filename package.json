@@ -1,7 +1,7 @@
 {
   "name": "gemini-desktop-companion",
   "productName": "Gemini Desktop Companion",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Android-style Circle to Search + Hold to Gemini for Windows — a glassmorphic AI companion living in your system tray.",
   "main": "out/main/index.js",
   "author": {

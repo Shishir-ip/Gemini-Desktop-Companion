@@ -182,7 +182,7 @@ export class GeminiApiClient extends EventEmitter {
     const parts: ChatPart[] = [{ text: prompt }]
     if (imageB64) parts.push({ inline_data: { mime_type: 'image/png', data: imageB64 } })
     const contents: ChatContent[] = [...this.history, { role: 'user', parts }]
-    await this.streamOnce(contents, { persist: true, startedLabel: 'chat', target: 'widget' })
+    await this.streamOnce(contents, { persist: true, startedLabel: 'chat', target: 'widget', rateRetries: 2 })
   }
 
   /**
@@ -207,7 +207,8 @@ export class GeminiApiClient extends EventEmitter {
       persist: false,
       startedLabel: 'vision',
       target: 'results',
-      useTools: true
+      useTools: true,
+      rateRetries: 2
     })
   }
 
@@ -235,6 +236,7 @@ export class GeminiApiClient extends EventEmitter {
       fallbackUsed?: boolean
       useTools?: boolean
       thinkingOff?: boolean
+      rateRetries?: number
     }
   ): Promise<void> {
     this.cancelActive()
@@ -371,6 +373,27 @@ export class GeminiApiClient extends EventEmitter {
               this.active = false
               clearInterval(watchdog)
               const status = res.statusCode ?? 0
+              // Free-tier per-minute quota: auto-retry with backoff instead
+              // of dead-ending.
+              const rateLeft = opts.rateRetries ?? 0
+              if (status === 429 && rateLeft > 0) {
+                const delayS = rateLeft === 2 ? 8 : 16
+                finished = true
+                this.active = false
+                clearInterval(watchdog)
+                emitT('status', {
+                  stage: 'working',
+                  detail: `Rate limited by the free tier — retrying in ${delayS}s…`
+                })
+                log(`[api] ${opts.startedLabel} 429 — retrying in ${delayS}s (${rateLeft - 1} retries left)`)
+                setTimeout(() => {
+                  void this.streamOnce(contents, {
+                    ...opts,
+                    rateRetries: rateLeft - 1
+                  }).catch(() => {})
+                }, delayS * 1000)
+                return
+              }
               // Some models reject the google_search tool — retry once
               // without grounding rather than failing.
               if (status === 400 && opts.useTools && /google_search|tool|search/i.test(errBody)) {

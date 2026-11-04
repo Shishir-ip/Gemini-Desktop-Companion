@@ -68,6 +68,11 @@ export function openResultsPanel(display: Display, dataUrl: string): void {
     panel = null
   })
 
+  // Auto-open the Google Lens results tab in the user's default browser —
+  // instant, quota-independent, and no extra click (the extension's proven
+  // browser-native form POST). The panel streams the Gemini analysis alongside.
+  void openLensInBrowser()
+
   loadRendererPage(panel, 'results')
   panel.once('ready-to-show', () => {
     if (!panel || panel.isDestroyed()) return
