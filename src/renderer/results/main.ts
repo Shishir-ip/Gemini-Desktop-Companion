@@ -30,12 +30,11 @@ async function init(): Promise<void> {
 
   btnLens.addEventListener('click', () => {
     btnLens.disabled = true
-    setStatus('Opening Google Lens…')
+    setStatus('Opening Google Lens in your browser…')
     void window.gdc.lens.openWeb().then((ok) => {
-      if (!ok) {
-        btnLens.disabled = false
-        setStatus('Lens upload failed — try again.', 'err')
-      }
+      btnLens.disabled = false
+      if (!ok) setStatus('Lens upload failed — try again.', 'err')
+      else setStatus('Lens opened in your browser', 'ok')
     })
   })
   btnClose.addEventListener('click', () => void window.gdc.lens.closePanel())
@@ -59,8 +58,27 @@ window.gdc.gemini.onChunk((payload) => {
   body.scrollTop = body.scrollHeight
 })
 window.gdc.gemini.onDone((payload) => {
-  if ((payload as { target?: string }).target !== 'results') return
+  const p = payload as {
+    target?: string
+    full: string
+    sources?: { title: string; uri: string }[]
+  }
+  if (p.target !== 'results') return
   setStatus('Done', 'ok')
+  // Grounded web sources (Google Search tool) — clickable, open externally.
+  if (p.sources && p.sources.length > 0) {
+    const list = p.sources
+      .slice(0, 8)
+      .map(
+        (s) =>
+          `<li><a data-href="${escapeHtml(s.uri)}">${escapeHtml(
+            s.title.length > 60 ? s.title.slice(0, 60) + '…' : s.title
+          )}</a></li>`
+      )
+      .join('')
+    body.innerHTML += `<h3>Web sources</h3><ul class="sources">${list}</ul>`
+  }
+  decorateTts()
 })
 window.gdc.gemini.onError((payload) => {
   const p = payload as GeminiErrorPayload

@@ -17,7 +17,7 @@ import {
   markOverlayReady
 } from './windows/overlay'
 import {
-  openLensForCrop,
+  openLensInBrowser,
   getLastCrop,
   closePanel,
   forwardResultsEvent,
@@ -53,7 +53,7 @@ export function registerIpc(): void {
   registerOverlayIpc()
 
   // ── Results panel (Gemini vision + Lens fallback) ────────────────────
-  ipcMain.handle(IPC.LensOpenWeb, async () => openLensForCrop())
+  ipcMain.handle(IPC.LensOpenWeb, async () => openLensInBrowser())
   ipcMain.handle(IPC.ResultsGetCrop, () => getLastCrop())
   ipcMain.handle(IPC.ResultsAnalyze, async () => {
     const crop = getLastCrop()

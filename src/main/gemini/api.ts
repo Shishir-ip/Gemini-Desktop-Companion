@@ -179,18 +179,25 @@ export class GeminiApiClient extends EventEmitter {
   }
 
   /**
-   * One-shot vision analysis (Circle to Search results panel). Streams like
-   * submit() but never touches the chat history.
+   * One-shot vision analysis (Circle to Search results panel) with Google
+   * Search grounding — real web results with source links. Streams like
+   * submit() but never touches the chat history. If the model rejects the
+   * search tool, it retries once without grounding.
    */
   async submitVision(prompt: string, imageB64: string): Promise<void> {
     if (!this.apiKey) {
-      this.emit('error', { code: 'NO_API_KEY', message: 'Connect Gemini first.', needsKey: true })
+      this.emit('error', { code: 'NO_API_KEY', message: 'Connect Gemini first.', needsKey: true, target: 'results' })
       return
     }
     const contents: ChatContent[] = [
       { role: 'user', parts: [{ text: prompt }, { inline_data: { mime_type: 'image/png', data: imageB64 } }] }
     ]
-    await this.streamOnce(contents, { persist: false, startedLabel: 'vision', target: 'results' })
+    await this.streamOnce(contents, {
+      persist: false,
+      startedLabel: 'vision',
+      target: 'results',
+      useTools: true
+    })
   }
 
   /**
@@ -215,6 +222,7 @@ export class GeminiApiClient extends EventEmitter {
       target: 'widget' | 'results'
       modelOverride?: string
       fallbackUsed?: boolean
+      useTools?: boolean
     }
   ): Promise<void> {
     this.cancelActive()
@@ -234,8 +242,10 @@ export class GeminiApiClient extends EventEmitter {
 
     const payload = JSON.stringify({
       contents,
-      generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+      generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+      ...(opts.useTools ? { tools: [{ google_search: {} }] } : {})
     })
+    const sources: { title: string; uri: string }[] = []
 
     let full = ''
     let sseBuffer = ''
@@ -259,7 +269,7 @@ export class GeminiApiClient extends EventEmitter {
           while (this.history.length > MAX_HISTORY_ENTRIES) this.history.shift()
         }
         cleanup(res)
-        emitT('done', { full })
+        emitT('done', { full, sources })
         log(`[api] ${opts.startedLabel} response complete (${full.length} chars, ${Date.now() - startedAt}ms)`)
       } else {
         cleanup(res)
@@ -338,6 +348,18 @@ export class GeminiApiClient extends EventEmitter {
               this.active = false
               clearInterval(watchdog)
               const status = res.statusCode ?? 0
+              // Some models reject the google_search tool — retry once
+              // without grounding rather than failing.
+              if (status === 400 && opts.useTools && /google_search|tool|search/i.test(errBody)) {
+                log(`[api] ${opts.startedLabel} search tool rejected — retrying without grounding`)
+                emitT('status', { stage: 'working', detail: 'Searching without web grounding…' })
+                void this.streamOnce(contents, {
+                  ...opts,
+                  useTools: false,
+                  modelOverride: opts.modelOverride
+                }).catch(() => {})
+                return
+              }
               // Google overloaded (free tier): transparently retry ONCE with
               // the other model rather than surfacing a dead end.
               if ((status === 503 || status === 500) && !opts.fallbackUsed) {
@@ -384,6 +406,16 @@ export class GeminiApiClient extends EventEmitter {
                 const parsed = JSON.parse(data)
                 const parts = parsed?.candidates?.[0]?.content?.parts
                 const delta = parts?.map((p: ChatPart) => p.text ?? '').join('') ?? ''
+                const chunks = parsed?.candidates?.[0]?.groundingMetadata?.groundingChunks
+                if (Array.isArray(chunks)) {
+                  for (const c of chunks) {
+                    const uri = c?.web?.uri
+                    const title = c?.web?.title ?? uri
+                    if (uri && title && !sources.some((x) => x.uri === uri)) {
+                      sources.push({ title: String(title).slice(0, 120), uri: String(uri) })
+                    }
+                  }
+                }
                 if (delta) {
                   full += delta
                   emitT('chunk', { append: delta, full })

@@ -137,3 +137,21 @@ body {
   font-size: 11px;
   color: var(--text-tertiary);
 }
+
+#body ul.sources {
+  margin: 8px 0 4px;
+  padding-left: 20px;
+}
+#body ul.sources li {
+  margin: 5px 0;
+  font-size: 12.5px;
+}
+#body ul.sources a {
+  color: #8ab4ff;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(138, 180, 255, 0.35);
+  cursor: pointer;
+}
+#body ul.sources a:hover {
+  color: #aecbff;
+}
