@@ -10,9 +10,10 @@ import { log } from '../logger'
  * Transport rules learned from production failures:
  *  - node:https connects DIRECT (system proxies broke net.fetch and SSE POSTs)
  *  - a stalled stream must NEVER be invisible: first-byte, idle and overall
- *    watchdogs abort the request and surface a specific error
- *  - GET probes (key validation) keep a short socket timeout; streaming POSTs
- *    are governed by the watchdogs instead
+ *    watchdogs start BEFORE the request and abort with a specific error
+ *  - requests cancel-and-replace: a new question aborts the in-flight one
+ *  - keepAlive TLS connections; thinking disabled for lowest TTFT
+ *  - every event is tagged with its stream target ('widget' | 'results')
  */
 
 const API_HOST = 'generativelanguage.googleapis.com'
@@ -22,7 +23,12 @@ const DEFAULT_MODEL: ModelId = 'gemini-3.8-flash'
 const FIRST_BYTE_TIMEOUT_MS = 60_000
 const IDLE_TIMEOUT_MS = 20_000
 const OVERALL_TIMEOUT_MS = 120_000
-const MAX_HISTORY_ENTRIES = 20
+// Small context = faster serialization + shorter model preamble.
+const MAX_HISTORY_ENTRIES = 8
+
+// Reuse TLS connections across requests — a fresh handshake per call adds
+// hundreds of ms on high-latency networks.
+const keepAliveAgent = new https.Agent({ keepAlive: true, maxSockets: 8 })
 
 export interface ApiState {
   hasKey: boolean
@@ -139,6 +145,7 @@ export class GeminiApiClient extends EventEmitter {
       if (status === 400 || status === 403)
         return 'That key was rejected by Google. Double-check it (a full AI Studio key starts with "AIza").'
       if (status === 429) return 'Rate limited by Google — try again in a minute.'
+      if (status === 503) return 'Google is overloaded right now (503) — try again in a few seconds.'
       return `Google answered ${status}. Check the key and your connection.`
     } catch (err) {
       return `Could not reach Google's API: ${String((err as Error)?.message ?? err)}`
@@ -159,8 +166,8 @@ export class GeminiApiClient extends EventEmitter {
   }
 
   /**
-   * Stream a chat response to all listeners.
-   * Events: status {stage}, chunk {append, full}, done {full}, error {code, message}.
+   * Stream a chat response to listeners with target 'widget'.
+   * Events: status, chunk, done, error — every payload carries its target.
    */
   async submit(prompt: string, imageB64: string | null): Promise<void> {
     if (!this.apiKey) {
@@ -180,13 +187,17 @@ export class GeminiApiClient extends EventEmitter {
 
   /**
    * One-shot vision analysis (Circle to Search results panel) with Google
-   * Search grounding — real web results with source links. Streams like
-   * submit() but never touches the chat history. If the model rejects the
-   * search tool, it retries once without grounding.
+   * Search grounding — real web results with source links. If a model
+   * rejects the search tool, it retries once without grounding.
    */
   async submitVision(prompt: string, imageB64: string): Promise<void> {
     if (!this.apiKey) {
-      this.emit('error', { code: 'NO_API_KEY', message: 'Connect Gemini first.', needsKey: true, target: 'results' })
+      this.emit('error', {
+        code: 'NO_API_KEY',
+        message: 'Connect Gemini first.',
+        needsKey: true,
+        target: 'results'
+      })
       return
     }
     const contents: ChatContent[] = [
@@ -223,18 +234,19 @@ export class GeminiApiClient extends EventEmitter {
       modelOverride?: string
       fallbackUsed?: boolean
       useTools?: boolean
+      thinkingOff?: boolean
     }
   ): Promise<void> {
     this.cancelActive()
     const myGen = ++this.gen
     const stale = (): boolean => myGen !== this.gen
+    const model = opts.modelOverride ?? this.model
     // Targeted emits: events carry their stream's target so each surface
     // (palette / results panel) renders only its own stream.
     const emitT = (channel: string, payload: Record<string, unknown>): void => {
       if (!stale()) this.emit(channel, { ...payload, target: opts.target })
     }
     this.active = true
-    // replaced once the request handle exists (see rawRequest callback)
     emitT('status', {
       stage: 'working',
       detail: contents.some((c) => c.parts.some((p) => p.inline_data)) ? 'Reading your screenshot…' : 'Thinking…'
@@ -242,7 +254,14 @@ export class GeminiApiClient extends EventEmitter {
 
     const payload = JSON.stringify({
       contents,
-      generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+      // Thinking is the #1 latency cost on flash models (dynamic thinking
+      // burns seconds before the first token). Disabled explicitly; if a
+      // model rejects the field, the error path retries without it.
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 2048,
+        ...(opts.thinkingOff ? {} : { thinkingConfig: { thinkingBudget: 0 } })
+      },
       ...(opts.useTools ? { tools: [{ google_search: {} }] } : {})
     })
     const sources: { title: string; uri: string }[] = []
@@ -251,7 +270,9 @@ export class GeminiApiClient extends EventEmitter {
     let sseBuffer = ''
     let finished = false
     let gotFirstByte = false
+    let firstByteAt = 0
     let lastDataAt = Date.now()
+    let usage = ''
     const startedAt = Date.now()
 
     const cleanup = (res?: import('node:http').IncomingMessage): void => {
@@ -269,8 +290,11 @@ export class GeminiApiClient extends EventEmitter {
           while (this.history.length > MAX_HISTORY_ENTRIES) this.history.shift()
         }
         cleanup(res)
-        emitT('done', { full, sources })
-        log(`[api] ${opts.startedLabel} response complete (${full.length} chars, ${Date.now() - startedAt}ms)`)
+        const ttft = firstByteAt ? firstByteAt - startedAt : 0
+        emitT('done', { full, sources, ttftMs: ttft, usage })
+        log(
+          `[api] ${opts.startedLabel} complete (${full.length} chars, total=${Date.now() - startedAt}ms, ttft=${ttft}ms, model=${model}, usage=${usage || 'n/a'})`
+        )
       } else {
         cleanup(res)
         emitT('error', {
@@ -291,8 +315,8 @@ export class GeminiApiClient extends EventEmitter {
     // Watchdogs start IMMEDIATELY — before the request — so a stall during
     // connect/TLS/headers can never be invisible (the exact "keeps thinking,
     // never responds" bug: the interval used to be created only after
-    // `await rawRequest(...)`, which never resolved on a pre-header stall).
-    let reqHandle: import("node:http").ClientRequest | null = null
+    // await rawRequest(...), which never resolved on a pre-header stall).
+    let reqHandle: import('node:http').ClientRequest | null = null
     const watchdog = setInterval(() => {
       if (finished || stale()) {
         clearInterval(watchdog)
@@ -331,7 +355,6 @@ export class GeminiApiClient extends EventEmitter {
     }, 1500)
 
     try {
-      const model = opts.modelOverride ?? this.model
       await this.rawRequest(
         'POST',
         `/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(this.apiKey)}`,
@@ -355,19 +378,24 @@ export class GeminiApiClient extends EventEmitter {
                 emitT('status', { stage: 'working', detail: 'Searching without web grounding…' })
                 void this.streamOnce(contents, {
                   ...opts,
-                  useTools: false,
-                  modelOverride: opts.modelOverride
+                  useTools: false
                 }).catch(() => {})
+                return
+              }
+              // thinkingConfig rejected (model/key dependent) — retry once without
+              // it so an answer always comes; dynamic thinking then applies.
+              if (status === 400 && !opts.thinkingOff) {
+                log(`[api] ${opts.startedLabel} thinkingConfig rejected — retrying without it`)
+                emitT('status', { stage: 'working', detail: 'Retrying…' })
+                void this.streamOnce(contents, { ...opts, thinkingOff: true }).catch(() => {})
                 return
               }
               // Google overloaded (free tier): transparently retry ONCE with
               // the other model rather than surfacing a dead end.
               if ((status === 503 || status === 500) && !opts.fallbackUsed) {
-                const other = MODELS.find((m) => m !== (opts.modelOverride ?? this.model))
+                const other = MODELS.find((m) => m !== model)
                 if (other) {
-                  log(
-                    `[api] ${opts.startedLabel} ${status} on ${model} — retrying once with ${other}`
-                  )
+                  log(`[api] ${opts.startedLabel} ${status} on ${model} — retrying once with ${other}`)
                   emitT('status', {
                     stage: 'working',
                     detail: 'Google is overloaded — retrying with the other model…'
@@ -391,7 +419,10 @@ export class GeminiApiClient extends EventEmitter {
             if (finished) return
             if (!gotFirstByte) {
               gotFirstByte = true
-              log(`[api] ${opts.startedLabel} response streaming started (${Date.now() - startedAt}ms to first byte)`)
+              firstByteAt = Date.now()
+              log(
+                `[api] ${opts.startedLabel} streaming started (${firstByteAt - startedAt}ms to first byte, model=${model}, thinkingOff=${!!opts.thinkingOff})`
+              )
             }
             lastDataAt = Date.now()
             sseBuffer += chunk
@@ -406,6 +437,9 @@ export class GeminiApiClient extends EventEmitter {
                 const parsed = JSON.parse(data)
                 const parts = parsed?.candidates?.[0]?.content?.parts
                 const delta = parts?.map((p: ChatPart) => p.text ?? '').join('') ?? ''
+                if (parsed?.usageMetadata) {
+                  usage = JSON.stringify(parsed.usageMetadata)
+                }
                 const chunks = parsed?.candidates?.[0]?.groundingMetadata?.groundingChunks
                 if (Array.isArray(chunks)) {
                   for (const c of chunks) {
@@ -454,7 +488,7 @@ export class GeminiApiClient extends EventEmitter {
     body: string | null,
     onResponse?: (res: import('node:http').IncomingMessage) => void,
     onError?: (err: Error) => void,
-    onRequest?: (req: import("node:http").ClientRequest) => void
+    onRequest?: (req: import('node:http').ClientRequest) => void
   ): Promise<number> {
     return new Promise((resolve, reject) => {
       const headers: Record<string, string | number> = {
@@ -465,7 +499,14 @@ export class GeminiApiClient extends EventEmitter {
         headers['Content-Length'] = Buffer.byteLength(body)
       }
       const req = https.request(
-        { host: API_HOST, path: pathAndQuery, method, headers, timeout: method === 'GET' ? 15000 : 0 },
+        {
+          host: API_HOST,
+          path: pathAndQuery,
+          method,
+          headers,
+          timeout: method === 'GET' ? 15000 : 0,
+          agent: keepAliveAgent
+        },
         (res) => {
           resolve(res.statusCode ?? 0)
           onResponse?.(res)

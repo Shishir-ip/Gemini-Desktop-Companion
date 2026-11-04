@@ -42,6 +42,7 @@ const prompt = document.getElementById('prompt') as HTMLTextAreaElement
 const sendBtn = document.getElementById('btn-send') as HTMLButtonElement
 const attachBtn = document.getElementById('btn-attach') as HTMLButtonElement
 const closeBtn = document.getElementById('btn-close') as HTMLButtonElement
+const minimizeBtn = document.getElementById('btn-minimize') as HTMLButtonElement
 const settingsBtn = document.getElementById('btn-settings') as HTMLButtonElement
 
 let attachment: Attachment | null = null
@@ -179,6 +180,12 @@ prompt.addEventListener('input', autoSize)
 attachBtn.addEventListener('click', () => void window.gdc.gemini.attachFromScreen())
 removeAttachmentBtn.addEventListener('click', () => void window.gdc.gemini.removeAttachment())
 closeBtn.addEventListener('click', close)
+// Minimize hides the palette but keeps the conversation (and any stream)
+// alive — reopen with Alt+Space or the tray and continue where you left off.
+minimizeBtn.addEventListener('click', () => {
+  document.body.classList.add('closing')
+  setTimeout(() => void window.gdc.gemini.close(), 150)
+})
 settingsBtn.addEventListener('click', () => void window.gdc.settings.open())
 newChatBtn.addEventListener('click', () => {
   responseText = ''
