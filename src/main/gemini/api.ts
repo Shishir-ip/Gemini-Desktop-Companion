@@ -19,9 +19,9 @@ const API_HOST = 'generativelanguage.googleapis.com'
 export const MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'] as const
 export type ModelId = (typeof MODELS)[number]
 const DEFAULT_MODEL: ModelId = 'gemini-3.8-flash'
-const FIRST_BYTE_TIMEOUT_MS = 40_000
-const IDLE_TIMEOUT_MS = 30_000
-const OVERALL_TIMEOUT_MS = 150_000
+const FIRST_BYTE_TIMEOUT_MS = 60_000
+const IDLE_TIMEOUT_MS = 20_000
+const OVERALL_TIMEOUT_MS = 120_000
 const MAX_HISTORY_ENTRIES = 20
 
 export interface ApiState {
@@ -46,6 +46,8 @@ export class GeminiApiClient extends EventEmitter {
   private model: ModelId = DEFAULT_MODEL
   private history: ChatContent[] = []
   private active = false
+  private gen = 0
+  private abortFn: (() => void) | null = null
 
   constructor() {
     super()
@@ -165,19 +167,15 @@ export class GeminiApiClient extends EventEmitter {
       this.emit('error', {
         code: 'NO_API_KEY',
         message: 'Connect Gemini first — create a free API key and paste it (Settings or the Home window).',
-        needsKey: true
+        needsKey: true,
+        target: 'widget'
       })
       return
     }
-    if (this.active) {
-      this.emit('error', { code: 'BUSY', message: 'Still answering the previous question — one moment.' })
-      return
-    }
-
     const parts: ChatPart[] = [{ text: prompt }]
     if (imageB64) parts.push({ inline_data: { mime_type: 'image/png', data: imageB64 } })
     const contents: ChatContent[] = [...this.history, { role: 'user', parts }]
-    await this.streamOnce(contents, { persist: true, startedLabel: 'chat' })
+    await this.streamOnce(contents, { persist: true, startedLabel: 'chat', target: 'widget' })
   }
 
   /**
@@ -189,22 +187,47 @@ export class GeminiApiClient extends EventEmitter {
       this.emit('error', { code: 'NO_API_KEY', message: 'Connect Gemini first.', needsKey: true })
       return
     }
-    if (this.active) {
-      this.emit('error', { code: 'BUSY', message: 'Still answering the previous question — one moment.' })
-      return
-    }
     const contents: ChatContent[] = [
       { role: 'user', parts: [{ text: prompt }, { inline_data: { mime_type: 'image/png', data: imageB64 } }] }
     ]
-    await this.streamOnce(contents, { persist: false, startedLabel: 'vision' })
+    await this.streamOnce(contents, { persist: false, startedLabel: 'vision', target: 'results' })
+  }
+
+  /**
+   * Cancel-and-replace: starting a new request aborts the in-flight one
+   * instantly. Stale callbacks (old generation) emit nothing — so pressing
+   * send again can never produce 'BUSY' or a vanished message.
+   */
+  cancelActive(): void {
+    if (this.active) {
+      this.gen++
+      try { this.abortFn?.() } catch { /* ignore */ }
+      this.active = false
+      log('[api] in-flight request cancelled (superseded)')
+    }
   }
 
   private async streamOnce(
     contents: ChatContent[],
-    opts: { persist: boolean; startedLabel: string }
+    opts: {
+      persist: boolean
+      startedLabel: string
+      target: 'widget' | 'results'
+      modelOverride?: string
+      fallbackUsed?: boolean
+    }
   ): Promise<void> {
+    this.cancelActive()
+    const myGen = ++this.gen
+    const stale = (): boolean => myGen !== this.gen
+    // Targeted emits: events carry their stream's target so each surface
+    // (palette / results panel) renders only its own stream.
+    const emitT = (channel: string, payload: Record<string, unknown>): void => {
+      if (!stale()) this.emit(channel, { ...payload, target: opts.target })
+    }
     this.active = true
-    this.emit('status', {
+    // replaced once the request handle exists (see rawRequest callback)
+    emitT('status', {
       stage: 'working',
       detail: contents.some((c) => c.parts.some((p) => p.inline_data)) ? 'Reading your screenshot…' : 'Thinking…'
     })
@@ -223,12 +246,12 @@ export class GeminiApiClient extends EventEmitter {
 
     const cleanup = (res?: import('node:http').IncomingMessage): void => {
       finished = true
-      this.active = false
+      if (stale()) this.active = false
       try { res?.destroy() } catch { /* ignore */ }
     }
 
     const finishOk = (res?: import('node:http').IncomingMessage): void => {
-      if (finished) return
+      if (finished || stale()) return
       if (full.length > 0) {
         if (opts.persist) {
           this.history.push({ role: 'user', parts: contents[contents.length - 1].parts })
@@ -236,11 +259,11 @@ export class GeminiApiClient extends EventEmitter {
           while (this.history.length > MAX_HISTORY_ENTRIES) this.history.shift()
         }
         cleanup(res)
-        this.emit('done', { full })
+        emitT('done', { full })
         log(`[api] ${opts.startedLabel} response complete (${full.length} chars, ${Date.now() - startedAt}ms)`)
       } else {
         cleanup(res)
-        this.emit('error', {
+        emitT('error', {
           code: 'EMPTY_RESPONSE',
           message: 'Gemini returned an empty response. Try again, or switch models in the palette.'
         })
@@ -249,9 +272,9 @@ export class GeminiApiClient extends EventEmitter {
     }
 
     const fail = (code: string, message: string, res?: import('node:http').IncomingMessage): void => {
-      if (finished) return
+      if (finished || stale()) return
       cleanup(res)
-      this.emit('error', { code, message })
+      emitT('error', { code, message })
       log(`[api] ${opts.startedLabel} failed: ${code} (${Date.now() - startedAt}ms)`)
     }
 
@@ -261,7 +284,7 @@ export class GeminiApiClient extends EventEmitter {
     // `await rawRequest(...)`, which never resolved on a pre-header stall).
     let reqHandle: import("node:http").ClientRequest | null = null
     const watchdog = setInterval(() => {
-      if (finished) {
+      if (finished || stale()) {
         clearInterval(watchdog)
         return
       }
@@ -298,9 +321,10 @@ export class GeminiApiClient extends EventEmitter {
     }, 1500)
 
     try {
+      const model = opts.modelOverride ?? this.model
       await this.rawRequest(
         'POST',
-        `/v1beta/models/${this.model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(this.apiKey)}`,
+        `/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(this.apiKey)}`,
         payload,
         (res) => {
           if (res.statusCode !== 200) {
@@ -313,8 +337,29 @@ export class GeminiApiClient extends EventEmitter {
               finished = true
               this.active = false
               clearInterval(watchdog)
-              this.emit('error', { code: 'API_ERROR', message: friendlyApiError(res.statusCode ?? 0, errBody) })
-              log(`[api] ${opts.startedLabel} API error ${res.statusCode}`)
+              const status = res.statusCode ?? 0
+              // Google overloaded (free tier): transparently retry ONCE with
+              // the other model rather than surfacing a dead end.
+              if ((status === 503 || status === 500) && !opts.fallbackUsed) {
+                const other = MODELS.find((m) => m !== (opts.modelOverride ?? this.model))
+                if (other) {
+                  log(
+                    `[api] ${opts.startedLabel} ${status} on ${model} — retrying once with ${other}`
+                  )
+                  emitT('status', {
+                    stage: 'working',
+                    detail: 'Google is overloaded — retrying with the other model…'
+                  })
+                  void this.streamOnce(contents, {
+                    ...opts,
+                    modelOverride: other,
+                    fallbackUsed: true
+                  }).catch(() => {})
+                  return
+                }
+              }
+              emitT('error', { code: 'API_ERROR', message: friendlyApiError(status, errBody) })
+              log(`[api] ${opts.startedLabel} API error ${status}`)
             })
             return
           }
@@ -341,8 +386,8 @@ export class GeminiApiClient extends EventEmitter {
                 const delta = parts?.map((p: ChatPart) => p.text ?? '').join('') ?? ''
                 if (delta) {
                   full += delta
-                  this.emit('chunk', { append: delta, full })
-                  this.emit('status', { stage: 'streaming' })
+                  emitT('chunk', { append: delta, full })
+                  emitT('status', { stage: 'streaming' })
                 }
               } catch { /* keep buffered remainder */ }
             }
@@ -356,6 +401,9 @@ export class GeminiApiClient extends EventEmitter {
         },
         (req) => {
           reqHandle = req
+          this.abortFn = () => {
+            try { reqHandle?.destroy(new Error('cancelled')) } catch { /* ignore */ }
+          }
         }
       ).catch((err) => {
         clearInterval(watchdog)
@@ -424,6 +472,12 @@ function friendlyApiError(status: number, body: string): string {
   }
   if (status === 429) {
     return 'Free-tier rate limit reached — wait a moment and try again.'
+  }
+  if (status === 503) {
+    return 'Google is overloaded right now (503). Try again in a few seconds, or switch models in the palette.'
+  }
+  if (status === 500) {
+    return 'Google hit an internal error (500). Try again — possibly with the other model.'
   }
   if (status === 404) {
     return `This model isn't available for your key (${status}). Try switching models in the palette.`

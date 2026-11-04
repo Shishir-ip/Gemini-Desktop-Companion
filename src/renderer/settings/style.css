@@ -236,3 +236,10 @@ button:disabled {
 .key-status.ok {
   color: var(--success);
 }
+
+.btn-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}

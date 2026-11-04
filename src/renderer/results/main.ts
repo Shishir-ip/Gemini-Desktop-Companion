@@ -43,12 +43,14 @@ async function init(): Promise<void> {
 
 window.gdc.gemini.onStatus((payload) => {
   const p = payload as GeminiStatusPayload
+  if ((p as { target?: string }).target !== 'results') return
   if (p.stage === 'working' && full.length === 0) {
     setStatus(p.detail ?? 'Thinking…')
   }
 })
 window.gdc.gemini.onChunk((payload) => {
   const p = payload as GeminiChunkPayload
+  if ((p as { target?: string }).target !== 'results') return
   setStatus('Gemini answer', 'ok')
   if (p.append) full += p.append
   else full = p.full
@@ -56,11 +58,13 @@ window.gdc.gemini.onChunk((payload) => {
   decorateTts()
   body.scrollTop = body.scrollHeight
 })
-window.gdc.gemini.onDone(() => {
+window.gdc.gemini.onDone((payload) => {
+  if ((payload as { target?: string }).target !== 'results') return
   setStatus('Done', 'ok')
 })
 window.gdc.gemini.onError((payload) => {
   const p = payload as GeminiErrorPayload
+  if ((p as { target?: string }).target !== 'results') return
   setStatus(p.message, 'err')
   body.innerHTML = `<div style="color:var(--danger);font-weight:600;margin-bottom:6px;">${
     p.code === 'NO_API_KEY' ? 'Connect Gemini first' : 'Something went wrong'

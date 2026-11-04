@@ -24,6 +24,7 @@ const toggleStartup = document.getElementById('toggle-startup') as HTMLElement
 const accountTitle = document.getElementById('account-title') as HTMLElement
 const accountSub = document.getElementById('account-sub') as HTMLElement
 const btnLogin = document.getElementById('btn-login') as HTMLButtonElement
+const btnChangeKey = document.getElementById('btn-change-key') as HTMLButtonElement
 const keyRow = document.getElementById('key-row') as HTMLElement
 const apiKeyInput = document.getElementById('api-key-input') as HTMLInputElement
 const saveKeyBtn = document.getElementById('btn-save-key') as HTMLButtonElement
@@ -247,16 +248,19 @@ function applyApi(state: ApiState): void {
     accountSub.textContent = `Streaming via the official API (${state.model}). The key is encrypted on this PC.`
     btnLogin.textContent = 'Manage key'
     btnLogin.disabled = false
+    // Connected: the key input stays hidden unless explicitly requested.
     keyRow.hidden = true
     keyStatus.hidden = true
+    btnChangeKey.hidden = false
   } else {
     accountTitle.textContent = 'Not connected'
     accountSub.textContent = 'Create a free key at aistudio.google.com/apikey, then paste it here.'
     btnLogin.textContent = 'Get API key'
     btnLogin.disabled = false
     keyRow.hidden = false
+    btnChangeKey.hidden = true
   }
-  modelSub.textContent = state.model || 'gemini-2.5-flash'
+  modelSub.textContent = state.model || 'gemini-3.8-flash'
 }
 
 async function saveKey(): Promise<void> {
@@ -296,6 +300,10 @@ async function saveKey(): Promise<void> {
 }
 
 btnLogin.addEventListener('click', () => void window.gdc.settings.openApiKeys())
+btnChangeKey.addEventListener('click', () => {
+  keyRow.hidden = !keyRow.hidden
+  if (!keyRow.hidden) apiKeyInput.focus()
+})
 saveKeyBtn.addEventListener('click', () => void saveKey())
 apiKeyInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') void saveKey()

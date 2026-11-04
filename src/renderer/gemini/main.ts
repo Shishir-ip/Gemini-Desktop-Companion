@@ -123,6 +123,7 @@ window.gdc.gemini.onAttachment((payload) => setAttachment(payload as Attachment 
 window.gdc.gemini.onApiChanged((payload) => setApiState(payload as ApiState))
 window.gdc.gemini.onStatus((payload) => {
   const p = payload as GeminiStatusPayload
+  if ((p as { target?: string }).target !== 'widget') return
   if (p.stage === 'working') {
     showThinking(p.detail ?? 'Thinking…')
   } else if (p.stage === 'streaming') {
@@ -131,6 +132,7 @@ window.gdc.gemini.onStatus((payload) => {
 })
 window.gdc.gemini.onChunk((payload) => {
   const p = payload as GeminiChunkPayload
+  if ((p as { target?: string }).target !== 'widget') return
   hasResponse = true
   hideThinking()
   hideError()
@@ -144,13 +146,15 @@ window.gdc.gemini.onChunk((payload) => {
   stream.innerHTML = renderMarkdown(responseText)
   scrollToBottom()
 })
-window.gdc.gemini.onDone(() => {
+window.gdc.gemini.onDone((payload) => {
+  if ((payload as { target?: string }).target !== 'widget') return
   streamCursor.hidden = true
   responseFooter.hidden = false
   hideThinking()
 })
 window.gdc.gemini.onError((payload) => {
   const p = payload as GeminiErrorPayload
+  if ((p as { target?: string }).target !== 'widget') return
   lastError = p
   hideThinking()
   streamCursor.hidden = true
