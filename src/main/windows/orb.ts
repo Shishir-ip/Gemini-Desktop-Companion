@@ -50,10 +50,15 @@ function bindDragIpc(): void {
   ipcMain.on('orb:drag-move', (event, dx: number, dy: number) => {
     const w = BrowserWindow.fromWebContents(event.sender)
     if (!w || !last) return
-    const b = w.getBounds()
-    const target = displayForBounds(b)
-    const next = clampToWorkArea(target.workArea, b.x + dx, b.y + dy, b.width, b.height)
-    w.setPosition(next.x, next.y)
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return
+    try {
+      const b = w.getBounds()
+      const target = displayForBounds(b)
+      const next = clampToWorkArea(target.workArea, b.x + dx, b.y + dy, b.width, b.height)
+      w.setPosition(next.x, next.y)
+    } catch (err) {
+      log(`[orb] drag-move failed: ${String(err)}`)
+    }
   })
 }
 

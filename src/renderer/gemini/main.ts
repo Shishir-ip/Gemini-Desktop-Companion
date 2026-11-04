@@ -40,7 +40,7 @@ const prompt = document.getElementById('prompt') as HTMLTextAreaElement
 const sendBtn = document.getElementById('btn-send') as HTMLButtonElement
 const attachBtn = document.getElementById('btn-attach') as HTMLButtonElement
 const closeBtn = document.getElementById('btn-close') as HTMLButtonElement
-const minimizeBtn = document.getElementById('btn-minimize') as HTMLButtonElement
+const pipBtn = document.getElementById('btn-pip') as HTMLButtonElement
 const settingsBtn = document.getElementById('btn-settings') as HTMLButtonElement
 
 let attachment: Attachment | null = null
@@ -48,7 +48,7 @@ let api: ApiState = { hasKey: false, valid: false, model: '' }
 let lastPrompt = ''
 let lastError: GeminiErrorPayload | null = null
 // Active model bubble being streamed into (null until the first chunk).
-let activeBubble: { body: HTMLDivElement; setText: (html: string) => void; raw: string } | null = null
+let activeBubble: { body: HTMLDivElement; setText: (html: string) => void } | null = null
 let lastCopyOk = false
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
@@ -139,57 +139,19 @@ function appendModelBubble(): void {
   const bubble = document.createElement('div')
   bubble.className = 'bubble'
   bubble.textContent = ''
-  const tools = document.createElement('div')
-  tools.className = 'bubble-tools'
-  const copy = document.createElement('button')
-  copy.className = 'bubble-copy'
-  copy.textContent = 'Copy'
-  copy.hidden = true
-  copy.addEventListener('click', () => {
-    void navigator.clipboard.writeText(activeBubbleRawOf(copy)).then(() => {
-      copy.textContent = '✓ Copied'
-      setTimeout(() => (copy.textContent = 'Copy'), 1600)
-    })
-  })
-  tools.appendChild(copy)
   msg.appendChild(bubble)
-  msg.appendChild(tools)
   messages.appendChild(msg)
   responseCard.hidden = false
   scrollMessages()
   activeBubble = {
     body: bubble,
-    raw: '',
     setText(html: string): void {
       bubble.innerHTML = html
     }
   }
-  // Copy reads the raw markdown of this bubble.
-  copy.dataset.for = 'active'
-  copyEventListenerFor = copy
 }
 
-// The raw text of the streaming bubble, so Copy always grabs full content.
-let copyEventListenerFor: HTMLButtonElement | null = null
 let activeBubbleRaw = ''
-function activeBubbleRawOf(btn: HTMLButtonElement): string {
-  return btn === copyEventListenerFor ? activeBubbleRaw : ''
-}
-
-function wireCopyForActive(): void {
-  if (!copyEventListenerFor) return
-  const btn = copyEventListenerFor
-  const raw = activeBubbleRaw
-  // Replace the listener by cloning.
-  const clone = btn.cloneNode(true) as HTMLButtonElement
-  clone.addEventListener('click', () => {
-    void navigator.clipboard.writeText(raw).then(() => {
-      clone.textContent = '✓ Copied'
-      setTimeout(() => (clone.textContent = 'Copy'), 1600)
-    })
-  })
-  btn.replaceWith(clone)
-}
 
 /* ── Events from main ──────────────────────────────────────────────────── */
 window.gdc.gemini.onAttachment((payload) => setAttachment(payload as Attachment | null))
@@ -212,14 +174,12 @@ window.gdc.gemini.onChunk((payload) => {
   if (!activeBubble) appendModelBubble()
   activeBubbleRaw = p.full
   activeBubble?.setText(renderMarkdown(activeBubbleRaw))
-  wireCopyForActive()
   scrollMessages()
 })
 window.gdc.gemini.onDone((payload) => {
   if ((payload as { target?: string }).target !== 'widget') return
   streamCursor.hidden = true
   hideThinking()
-  if (copyEventListenerFor) copyEventListenerFor.hidden = false
   responseFooter.hidden = false
 })
 window.gdc.gemini.onError((payload) => {
@@ -247,8 +207,16 @@ prompt.addEventListener('input', autoSize)
 
 attachBtn.addEventListener('click', () => void window.gdc.gemini.attachFromScreen())
 removeAttachmentBtn.addEventListener('click', () => void window.gdc.gemini.removeAttachment())
-closeBtn.addEventListener('click', close)
-minimizeBtn.addEventListener('click', close)
+closeBtn.addEventListener('click', () => {
+  // X = close the chat: hide the window AND discard the conversation.
+  document.body.classList.add('closing')
+  setTimeout(() => void window.gdc.gemini.close(), 150)
+})
+pipBtn.addEventListener('click', () => {
+  // PIP = minimize into the floating orb; chat + context keep running.
+  document.body.classList.add('closing')
+  setTimeout(() => void window.gdc.gemini.pip(), 150)
+})
 settingsBtn.addEventListener('click', () => void window.gdc.settings.open())
 newChatBtn.addEventListener('click', () => {
   messages.innerHTML = ''
@@ -317,7 +285,7 @@ async function saveKey(): Promise<void> {
 
 // Click on the empty area around the sheet closes the widget (iOS behavior).
 wrap.addEventListener('pointerdown', (e) => {
-  if (e.target === wrap) close()
+  if (e.target === wrap) pip()
 })
 
 /* ── Click-through: invisible regions must never block the desktop ─────── */
@@ -341,7 +309,7 @@ document.addEventListener('pointerout', (e) => {
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     e.preventDefault()
-    close()
+    pip()
   }
 })
 
@@ -398,6 +366,11 @@ function hideError(): void {
 function close(): void {
   document.body.classList.add('closing')
   setTimeout(() => void window.gdc.gemini.close(), 150)
+}
+
+function pip(): void {
+  document.body.classList.add('closing')
+  setTimeout(() => void window.gdc.gemini.pip(), 150)
 }
 
 function autoSize(): void {

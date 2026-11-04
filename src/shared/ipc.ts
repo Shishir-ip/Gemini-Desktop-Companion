@@ -21,6 +21,7 @@ export const IPC = {
   GeminiRemoveAttachment: 'gemini:remove-attachment',
   GeminiNewChat: 'gemini:new-chat',
   GeminiClose: 'gemini:close',
+  GeminiPip: 'gemini:pip',
   WidgetSetIgnoreMouse: 'widget:set-ignore-mouse',
   GeminiApiChanged: 'gemini:api-changed', // main → widget renderer
   GeminiStatus: 'gemini:status', // main → renderer

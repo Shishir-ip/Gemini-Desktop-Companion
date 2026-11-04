@@ -8,6 +8,7 @@ import type { ApiState, GeminiChunkPayload, GeminiErrorPayload, GeminiStatusPayl
 const status = document.getElementById('status') as HTMLElement
 const body = document.getElementById('body') as HTMLDivElement
 const cropThumb = document.getElementById('crop-thumb') as HTMLImageElement
+const btnLens = document.getElementById('btn-lens') as HTMLButtonElement
 const btnClose = document.getElementById('btn-close') as HTMLButtonElement
 
 let full = ''
@@ -37,6 +38,14 @@ async function init(): Promise<void> {
   // Kick off the analysis (events arrive via the shared Gemini channels).
   void window.gdc.lens.analyze()
 
+  btnLens.addEventListener('click', () => {
+    btnLens.disabled = true
+    setStatus('Opening Lens window…')
+    void window.gdc.lens.openWeb().then((ok) => {
+      btnLens.disabled = false
+      if (!ok) setStatus('Lens window failed — try again.', 'err')
+    })
+  })
   btnClose.addEventListener('click', () => void window.gdc.lens.closePanel())
 }
 

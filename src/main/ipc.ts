@@ -20,7 +20,8 @@ import {
   getLastCrop,
   closePanel,
   forwardResultsEvent,
-  getPanelWindow
+  getPanelWindow,
+  reopenLensPopup
 } from './windows/resultsPanel'
 import {
   hideGeminiWidget,
@@ -54,6 +55,7 @@ export function registerIpc(): void {
 
   // ── Results panel (Gemini vision + Lens fallback) ────────────────────
   ipcMain.handle(IPC.ResultsGetCrop, () => getLastCrop())
+  ipcMain.handle(IPC.LensOpenWeb, async () => reopenLensPopup())
   ipcMain.handle(IPC.ResultsAnalyze, async () => {
     const crop = getLastCrop()
     if (!crop) return
@@ -106,7 +108,13 @@ export function registerIpc(): void {
   })
   ipcMain.handle(IPC.GeminiRemoveAttachment, () => clearPendingAttachment())
   ipcMain.handle(IPC.GeminiNewChat, () => gemini.resetChat())
-  ipcMain.handle(IPC.GeminiClose, () => hideGeminiWidget({ orb: true }))
+  // X = close the chat: hide the window AND discard the conversation.
+  ipcMain.handle(IPC.GeminiClose, () => {
+    hideGeminiWidget()
+    gemini.resetChat()
+  })
+  // PIP = minimize into the orb; conversation continues.
+  ipcMain.handle(IPC.GeminiPip, () => hideGeminiWidget({ orb: true }))
   ipcMain.handle(IPC.WidgetSetIgnoreMouse, (_event, ignore: boolean) => {
     setWidgetIgnoreMouse(Boolean(ignore))
   })

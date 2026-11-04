@@ -65,12 +65,29 @@ export function openResultsPanel(display: Display, dataUrl: string): void {
     panel = null
   })
 
+  // Auto-open the standalone Lens popup window (the reporter's extension
+  // logic: browser-native form POST → full results, own window — no tab
+  // merging, no bot walls).
+  try {
+    const { openLensPopup } = require('../browser') as typeof import('../browser')
+    openLensPopup(dataUrl)
+  } catch (err) {
+    log(`[results] Lens popup failed: ${String(err)}`)
+  }
+
   loadRendererPage(panel, 'results')
   panel.once('ready-to-show', () => {
     if (!panel || panel.isDestroyed()) return
     panel.show()
     animateWindowBounds(panel, start, target, 240)
   })
+}
+
+/** Re-open the standalone Lens popup for the stored crop. */
+export function reopenLensPopup(): boolean {
+  if (!lastCrop) return false
+  const { openLensPopup } = require('../browser') as typeof import('../browser')
+  return openLensPopup(lastCrop)
 }
 
 export function getLastCrop(): string | null {
