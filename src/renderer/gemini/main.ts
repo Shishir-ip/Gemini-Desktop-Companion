@@ -7,23 +7,21 @@ import type {
 } from '../../shared/types'
 
 /**
- * Floating Gemini command palette, powered by the official Gemini API
- * (streaming SSE, native screenshot input, in-app conversation context).
+ * Floating Gemini command palette — chat-bubble UI (user prompts right,
+ * answers left, copy per answer), powered by the official Gemini API.
  */
 
 const wrap = document.getElementById('wrap') as HTMLDivElement
 const responseCard = document.getElementById('response-card') as HTMLElement
+const messages = document.getElementById('messages') as HTMLDivElement
 const thinking = document.getElementById('thinking') as HTMLElement
 const thinkingDetail = document.getElementById('thinking-detail') as HTMLElement
-const stream = document.getElementById('stream') as HTMLDivElement
 const errorBox = document.getElementById('error-box') as HTMLElement
 const errorTitle = document.getElementById('error-title') as HTMLElement
 const errorMessage = document.getElementById('error-message') as HTMLElement
 const errorRetry = document.getElementById('error-retry') as HTMLButtonElement
 const errorSignin = document.getElementById('error-signin') as HTMLButtonElement
-const errorOpenGemini = document.getElementById('error-opengemini') as HTMLButtonElement
 const responseFooter = document.getElementById('response-footer') as HTMLElement
-const copyBtn = document.getElementById('btn-copy') as HTMLButtonElement
 const newChatBtn = document.getElementById('btn-newchat') as HTMLButtonElement
 const streamCursor = document.getElementById('stream-cursor') as HTMLElement
 const apiDot = document.getElementById('api-dot') as HTMLElement
@@ -49,8 +47,8 @@ let attachment: Attachment | null = null
 let api: ApiState = { hasKey: false, valid: false, model: '' }
 let lastPrompt = ''
 let lastError: GeminiErrorPayload | null = null
-let responseText = ''
-let hasResponse = false
+// Active model bubble being streamed into (null until the first chunk).
+let activeBubble: { body: HTMLDivElement; setText: (html: string) => void; raw: string } | null = null
 let lastCopyOk = false
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
@@ -103,7 +101,6 @@ function setApiState(state: ApiState): void {
     prompt.placeholder = 'Ask Gemini anything…'
     autoSize()
   }
-  // Model chips reflect the active model.
   chip38.classList.toggle('active', state.model === 'gemini-3.8-flash')
   chip35.classList.toggle('active', state.model === 'gemini-3.5-flash-lite')
 }
@@ -117,6 +114,81 @@ async function switchModel(model: string): Promise<void> {
     state: ApiState
   }
   if (res.ok) setApiState(res.state)
+}
+
+/* ── Chat bubbles ──────────────────────────────────────────────────────── */
+function scrollMessages(): void {
+  messages.scrollTop = messages.scrollHeight
+}
+
+function appendUserBubble(text: string): void {
+  const msg = document.createElement('div')
+  msg.className = 'msg user'
+  const bubble = document.createElement('div')
+  bubble.className = 'bubble'
+  bubble.textContent = text
+  msg.appendChild(bubble)
+  messages.appendChild(msg)
+  responseCard.hidden = false
+  scrollMessages()
+}
+
+function appendModelBubble(): void {
+  const msg = document.createElement('div')
+  msg.className = 'msg model'
+  const bubble = document.createElement('div')
+  bubble.className = 'bubble'
+  bubble.textContent = ''
+  const tools = document.createElement('div')
+  tools.className = 'bubble-tools'
+  const copy = document.createElement('button')
+  copy.className = 'bubble-copy'
+  copy.textContent = 'Copy'
+  copy.hidden = true
+  copy.addEventListener('click', () => {
+    void navigator.clipboard.writeText(activeBubbleRawOf(copy)).then(() => {
+      copy.textContent = '✓ Copied'
+      setTimeout(() => (copy.textContent = 'Copy'), 1600)
+    })
+  })
+  tools.appendChild(copy)
+  msg.appendChild(bubble)
+  msg.appendChild(tools)
+  messages.appendChild(msg)
+  responseCard.hidden = false
+  scrollMessages()
+  activeBubble = {
+    body: bubble,
+    raw: '',
+    setText(html: string): void {
+      bubble.innerHTML = html
+    }
+  }
+  // Copy reads the raw markdown of this bubble.
+  copy.dataset.for = 'active'
+  copyEventListenerFor = copy
+}
+
+// The raw text of the streaming bubble, so Copy always grabs full content.
+let copyEventListenerFor: HTMLButtonElement | null = null
+let activeBubbleRaw = ''
+function activeBubbleRawOf(btn: HTMLButtonElement): string {
+  return btn === copyEventListenerFor ? activeBubbleRaw : ''
+}
+
+function wireCopyForActive(): void {
+  if (!copyEventListenerFor) return
+  const btn = copyEventListenerFor
+  const raw = activeBubbleRaw
+  // Replace the listener by cloning.
+  const clone = btn.cloneNode(true) as HTMLButtonElement
+  clone.addEventListener('click', () => {
+    void navigator.clipboard.writeText(raw).then(() => {
+      clone.textContent = '✓ Copied'
+      setTimeout(() => (clone.textContent = 'Copy'), 1600)
+    })
+  })
+  btn.replaceWith(clone)
 }
 
 /* ── Events from main ──────────────────────────────────────────────────── */
@@ -134,24 +206,21 @@ window.gdc.gemini.onStatus((payload) => {
 window.gdc.gemini.onChunk((payload) => {
   const p = payload as GeminiChunkPayload
   if ((p as { target?: string }).target !== 'widget') return
-  hasResponse = true
   hideThinking()
   hideError()
-  streamCursor.hidden = false
   responseFooter.hidden = true
-  if (p.append) {
-    responseText += p.append
-  } else {
-    responseText = p.full
-  }
-  stream.innerHTML = renderMarkdown(responseText)
-  scrollToBottom()
+  if (!activeBubble) appendModelBubble()
+  activeBubbleRaw = p.full
+  activeBubble?.setText(renderMarkdown(activeBubbleRaw))
+  wireCopyForActive()
+  scrollMessages()
 })
 window.gdc.gemini.onDone((payload) => {
   if ((payload as { target?: string }).target !== 'widget') return
   streamCursor.hidden = true
-  responseFooter.hidden = false
   hideThinking()
+  if (copyEventListenerFor) copyEventListenerFor.hidden = false
+  responseFooter.hidden = false
 })
 window.gdc.gemini.onError((payload) => {
   const p = payload as GeminiErrorPayload
@@ -160,11 +229,10 @@ window.gdc.gemini.onError((payload) => {
   hideThinking()
   streamCursor.hidden = true
   errorBox.hidden = false
-  responseFooter.hidden = true
+  responseFooter.hidden = false
   errorTitle.textContent = p.code === 'NO_API_KEY' ? 'Gemini is not connected' : 'Something went wrong'
   errorMessage.textContent = p.message
   errorSignin.hidden = !p.needsKey
-  errorOpenGemini.hidden = false
 })
 
 /* ── Actions ───────────────────────────────────────────────────────────── */
@@ -180,30 +248,16 @@ prompt.addEventListener('input', autoSize)
 attachBtn.addEventListener('click', () => void window.gdc.gemini.attachFromScreen())
 removeAttachmentBtn.addEventListener('click', () => void window.gdc.gemini.removeAttachment())
 closeBtn.addEventListener('click', close)
-// Minimize hides the palette but keeps the conversation (and any stream)
-// alive — reopen with Alt+Space or the tray and continue where you left off.
-minimizeBtn.addEventListener('click', () => {
-  document.body.classList.add('closing')
-  setTimeout(() => void window.gdc.gemini.close(), 150)
-})
+minimizeBtn.addEventListener('click', close)
 settingsBtn.addEventListener('click', () => void window.gdc.settings.open())
 newChatBtn.addEventListener('click', () => {
-  responseText = ''
-  hasResponse = false
-  responseFooter.hidden = true
+  messages.innerHTML = ''
   responseCard.hidden = true
+  responseFooter.hidden = true
+  activeBubble = null
+  activeBubbleRaw = ''
   void window.gdc.gemini.newChat()
   prompt.focus()
-})
-copyBtn.addEventListener('click', () => {
-  void navigator.clipboard.writeText(responseText).then(() => {
-    copyBtn.textContent = '✓ Copied'
-    lastCopyOk = true
-    setTimeout(() => {
-      copyBtn.textContent = 'Copy'
-      lastCopyOk = false
-    }, 1600)
-  })
 })
 errorRetry.addEventListener('click', () => {
   hideError()
@@ -213,9 +267,6 @@ errorSignin.addEventListener('click', () => {
   hideError()
   apiBanner.hidden = false
   apiKeyInput.focus()
-})
-errorOpenGemini.addEventListener('click', () => {
-  void window.gdc.openExternal('https://aistudio.google.com/apikey')
 })
 getKeyBtn.addEventListener('click', () => {
   void window.gdc.openExternal('https://aistudio.google.com/apikey')
@@ -265,8 +316,6 @@ async function saveKey(): Promise<void> {
 }
 
 // Click on the empty area around the sheet closes the widget (iOS behavior).
-// NOTE: the window is OS-level click-through outside the glass cards, so
-// this only fires in the narrow gap between the two cards.
 wrap.addEventListener('pointerdown', (e) => {
   if (e.target === wrap) close()
 })
@@ -285,7 +334,6 @@ document.addEventListener('pointermove', (e) => {
   const overCard = !!(el && typeof el.closest === 'function' && el.closest('.glass-card'))
   applyIgnoreMouse(!overCard)
 })
-// When the pointer leaves the window entirely, go back to click-through.
 document.addEventListener('pointerout', (e) => {
   if (!e.relatedTarget) applyIgnoreMouse(true)
 })
@@ -305,14 +353,14 @@ async function submit(forceText?: string, isRetry = false): Promise<void> {
   const text = (forceText ?? prompt.value).trim()
   if (!text && !attachment && !isRetry) return
   lastPrompt = text || lastPrompt
+  // The user prompt becomes a bubble; the answer streams below it.
+  appendUserBubble(text || '(screenshot)')
   prompt.value = ''
   autoSize()
   hideError()
   showThinking(attachment ? 'Reading your screenshot…' : 'Thinking…')
-
-  if (!hasResponse) stream.innerHTML = ''
-  responseCard.hidden = false
-  scrollToBottom()
+  activeBubble = null
+  activeBubbleRaw = ''
 
   try {
     await window.gdc.gemini.submit(text)
@@ -330,7 +378,7 @@ function showThinking(detail: string): void {
   responseFooter.hidden = true
   errorBox.hidden = true
   responseCard.hidden = false
-  scrollToBottom()
+  scrollMessages()
 }
 function hideThinking(): void {
   thinking.hidden = true
@@ -341,7 +389,6 @@ function showError(code: string, message: string): void {
   errorTitle.textContent = code === 'NO_API_KEY' ? 'Gemini is not connected' : 'Something went wrong'
   errorMessage.textContent = message
   errorSignin.hidden = !lastError.needsKey
-  errorOpenGemini.hidden = code === 'NO_API_KEY'
   responseCard.hidden = false
 }
 function hideError(): void {
@@ -359,10 +406,6 @@ function autoSize(): void {
   sendBtn.disabled = prompt.value.trim().length === 0 && !attachment
 }
 sendBtn.disabled = true
-
-function scrollToBottom(): void {
-  stream.scrollTop = stream.scrollHeight
-}
 
 /* ── Tiny markdown renderer (escape-first, then transform) ─────────────── */
 function escapeHtml(src: string): string {
@@ -415,7 +458,7 @@ function renderMarkdown(src: string): string {
 }
 
 // Links open in the user's real browser.
-stream.addEventListener('click', (e) => {
+messages.addEventListener('click', (e) => {
   const target = e.target as HTMLElement
   const anchor = target.closest('a[data-href]')
   if (anchor) {

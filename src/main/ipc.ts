@@ -17,7 +17,6 @@ import {
   markOverlayReady
 } from './windows/overlay'
 import {
-  openLensInBrowser,
   getLastCrop,
   closePanel,
   forwardResultsEvent,
@@ -27,7 +26,8 @@ import {
   hideGeminiWidget,
   showGeminiWidget,
   forwardGeminiEvent,
-  setWidgetIgnoreMouse
+  setWidgetIgnoreMouse,
+  openPaletteFromOrb
 } from './windows/geminiWidget'
 import { openSettings, pushApiChanged } from './windows/settingsWindow'
 import { log } from './logger'
@@ -53,7 +53,6 @@ export function registerIpc(): void {
   registerOverlayIpc()
 
   // ── Results panel (Gemini vision + Lens fallback) ────────────────────
-  ipcMain.handle(IPC.LensOpenWeb, async () => openLensInBrowser())
   ipcMain.handle(IPC.ResultsGetCrop, () => getLastCrop())
   ipcMain.handle(IPC.ResultsAnalyze, async () => {
     const crop = getLastCrop()
@@ -107,7 +106,7 @@ export function registerIpc(): void {
   })
   ipcMain.handle(IPC.GeminiRemoveAttachment, () => clearPendingAttachment())
   ipcMain.handle(IPC.GeminiNewChat, () => gemini.resetChat())
-  ipcMain.handle(IPC.GeminiClose, () => hideGeminiWidget())
+  ipcMain.handle(IPC.GeminiClose, () => hideGeminiWidget({ orb: true }))
   ipcMain.handle(IPC.WidgetSetIgnoreMouse, (_event, ignore: boolean) => {
     setWidgetIgnoreMouse(Boolean(ignore))
   })
@@ -165,6 +164,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.AppOpenExternal, (_event, url: string) => openExternalUrl(url))
   ipcMain.handle(IPC.AppStartCircle, () => void startCircleToSearch('lens'))
   ipcMain.handle(IPC.AppShowWidget, () => showGeminiWidget())
+  ipcMain.handle(IPC.OrbOpen, () => openPaletteFromOrb())
   ipcMain.handle(IPC.WindowMinimize, (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize()
   })

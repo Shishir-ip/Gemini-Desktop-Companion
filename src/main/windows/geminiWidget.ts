@@ -3,6 +3,7 @@ import type { Display } from 'electron'
 import { IPC } from '../../shared/ipc'
 import { loadRendererPage, preloadPath } from '../paths'
 import { log } from '../logger'
+import { showOrb, hideOrb } from './orb'
 
 let widget: BrowserWindow | null = null
 
@@ -89,7 +90,7 @@ export function showGeminiWidget(): void {
   // Guaranteed Esc — works even with a dead renderer.
   widget.webContents.on('before-input-event', (_event, input) => {
     if (input.type === 'keyDown' && input.key === 'Escape') {
-      hideGeminiWidget()
+      hideGeminiWidget({ orb: true })
     }
   })
   widget.once('ready-to-show', () => {
@@ -111,17 +112,28 @@ function destroyWidget(): void {
   widget = null
 }
 
-export function hideGeminiWidget(): void {
+/**
+ * Hide the palette. `opts.orb` shows the draggable Gemini orb so the user
+ * can reopen the conversation (chat + streams continue while hidden).
+ */
+export function hideGeminiWidget(opts?: { orb?: boolean }): void {
   if (widget && !widget.isDestroyed()) {
     widget.hide()
     // Reset to click-through so a hidden/shown window never blocks input.
     widget.setIgnoreMouseEvents(true, { forward: true })
+    if (opts?.orb) showOrb(widget.getBounds())
   }
+}
+
+/** Orb click → reopen the palette (context preserved). */
+export function openPaletteFromOrb(): void {
+  hideOrb()
+  showGeminiWidget()
 }
 
 export function toggleGeminiWidget(): void {
   if (widget && !widget.isDestroyed() && widget.isVisible()) {
-    hideGeminiWidget()
+    hideGeminiWidget({ orb: true })
   } else {
     showGeminiWidget()
   }

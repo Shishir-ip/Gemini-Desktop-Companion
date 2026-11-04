@@ -12,13 +12,13 @@
   </head>
   <body>
     <div id="wrap">
-      <!-- Response card -->
+      <!-- Response card: chat bubbles -->
       <section id="response-card" class="glass-card" hidden>
+        <div id="messages"></div>
         <div id="thinking" class="thinking-row" hidden>
           <span class="dot"></span><span class="dot"></span><span class="dot"></span>
           <span id="thinking-detail">Thinking…</span>
         </div>
-        <div id="stream" tabindex="0"></div>
         <div id="error-box" hidden>
           <div id="error-title">Something went wrong</div>
           <div id="error-message"></div>
@@ -34,10 +34,6 @@
           <button id="btn-newchat" class="glass-btn">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             New chat
-          </button>
-          <button id="btn-copy" class="glass-btn">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-            Copy
           </button>
           <span id="stream-cursor"></span>
         </div>

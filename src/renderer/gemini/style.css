@@ -30,11 +30,126 @@ body.closing #input-card {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 18px 20px 14px;
+  padding: 14px 16px 12px;
   overflow: hidden;
 }
 #response-card[hidden] {
   display: none;
+}
+
+/* Chat bubbles: user right, model left, copy per answer */
+#messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+  padding-bottom: 6px;
+}
+.msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 88%;
+}
+.msg.user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.msg.model {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+.bubble {
+  padding: 9px 13px;
+  border-radius: 16px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  user-select: text;
+  cursor: text;
+  word-break: break-word;
+}
+.msg.user .bubble {
+  background: linear-gradient(135deg, rgba(79, 140, 255, 0.32), rgba(168, 85, 247, 0.32));
+  border: 1px solid rgba(126, 166, 255, 0.35);
+  border-bottom-right-radius: 5px;
+  white-space: pre-wrap;
+}
+.msg.model .bubble {
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
+  border-bottom-left-radius: 5px;
+}
+.bubble h3 {
+  font-size: 13.5px;
+  font-weight: 650;
+  margin: 10px 0 5px;
+  color: #cfe0ff;
+}
+.bubble ul,
+.bubble ol {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+.bubble li {
+  margin: 3px 0;
+}
+.bubble strong {
+  font-weight: 650;
+  color: #fff;
+}
+.bubble a {
+  color: #8ab4ff;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(138, 180, 255, 0.35);
+  cursor: pointer;
+}
+.bubble code {
+  font-family: 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+.bubble pre.code {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 11px 13px;
+  overflow-x: auto;
+  margin: 9px 0;
+}
+.bubble pre.code code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  white-space: pre;
+}
+.bubble-tools {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity 200ms var(--ease-ios);
+}
+.msg:hover .bubble-tools {
+  opacity: 1;
+}
+.bubble-copy {
+  border: none;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 10.5px;
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.bubble-copy:hover {
+  background: rgba(255, 255, 255, 0.13);
+  color: var(--text-primary);
 }
 
 .thinking-row {
@@ -63,67 +178,6 @@ body.closing #input-card {
   color: var(--text-secondary);
 }
 
-#stream {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  font-size: 14.5px;
-  line-height: 1.62;
-  color: var(--text-primary);
-  user-select: text;
-  cursor: text;
-  white-space: normal;
-  padding-right: 6px;
-}
-#stream h3 {
-  font-size: 14.5px;
-  font-weight: 650;
-  margin: 14px 0 6px;
-  color: #cfe0ff;
-}
-#stream ul,
-#stream ol {
-  margin: 6px 0;
-  padding-left: 22px;
-}
-#stream li {
-  margin: 3px 0;
-}
-#stream strong {
-  font-weight: 650;
-  color: #fff;
-}
-#stream a {
-  color: #8ab4ff;
-  text-decoration: none;
-  border-bottom: 1px solid rgba(138, 180, 255, 0.35);
-  cursor: pointer;
-}
-#stream code {
-  font-family: 'Cascadia Code', 'SF Mono', Consolas, monospace;
-  font-size: 12.5px;
-  background: rgba(255, 255, 255, 0.09);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 1px 6px;
-}
-#stream pre.code {
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 12px 14px;
-  overflow-x: auto;
-  margin: 10px 0;
-  user-select: text;
-}
-#stream pre.code code {
-  background: transparent;
-  border: none;
-  padding: 0;
-  font-size: 12.5px;
-  line-height: 1.55;
-  white-space: pre;
-}
 
 #error-box {
   padding: 4px 2px 6px;

@@ -182,7 +182,7 @@ export class GeminiApiClient extends EventEmitter {
     const parts: ChatPart[] = [{ text: prompt }]
     if (imageB64) parts.push({ inline_data: { mime_type: 'image/png', data: imageB64 } })
     const contents: ChatContent[] = [...this.history, { role: 'user', parts }]
-    await this.streamOnce(contents, { persist: true, startedLabel: 'chat', target: 'widget', rateRetries: 2 })
+    await this.streamOnce(contents, { persist: true, startedLabel: 'chat', target: 'widget', rateRetries: 3 })
   }
 
   /**
@@ -208,7 +208,7 @@ export class GeminiApiClient extends EventEmitter {
       startedLabel: 'vision',
       target: 'results',
       useTools: true,
-      rateRetries: 2
+      rateRetries: 3
     })
   }
 
@@ -377,7 +377,7 @@ export class GeminiApiClient extends EventEmitter {
               // of dead-ending.
               const rateLeft = opts.rateRetries ?? 0
               if (status === 429 && rateLeft > 0) {
-                const delayS = rateLeft === 2 ? 8 : 16
+                const delayS = rateLeft === 3 ? 8 : rateLeft === 2 ? 16 : 30
                 finished = true
                 this.active = false
                 clearInterval(watchdog)

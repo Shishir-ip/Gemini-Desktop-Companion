@@ -1,0 +1,44 @@
+/* The draggable Gemini orb — minimize target for the palette. */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+#orb {
+  position: fixed;
+  inset: 0;
+  width: 76px;
+  height: 76px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(30, 30, 36, 0.92), rgba(18, 18, 22, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55), 0 0 26px rgba(126, 166, 255, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: box-shadow 200ms var(--ease-ios, ease), transform 200ms var(--ease-ios, ease);
+  user-select: none;
+  -webkit-user-select: none;
+}
+#orb:hover {
+  transform: scale(1.07);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.6), 0 0 34px rgba(126, 166, 255, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+#orb:active {
+  transform: scale(0.96);
+}
+#orb img {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(126, 166, 255, 0.45);
+  pointer-events: none;
+}

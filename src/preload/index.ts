@@ -16,7 +16,6 @@ const IPC = {
   CircleDismissAll: 'circle:dismiss-all',
   CircleSetLensMode: 'circle:set-lens-mode',
   LensRetry: 'lens:retry',
-  LensOpenWeb: 'lens:open-web',
   ResultsGetCrop: 'results:get-crop',
   ResultsAnalyze: 'results:analyze',
   GeminiGetState: 'gemini:get-state',
@@ -44,6 +43,9 @@ const IPC = {
   ApiChanged: 'api:changed',
   AppOpenExternal: 'app:open-external',
   AppStartCircle: 'app:start-circle',
+  OrbOpen: 'orb:open',
+  OrbDragStart: 'orb:drag-start',
+  OrbDragMove: 'orb:drag-move',
   AppShowWidget: 'app:show-widget',
   WindowClose: 'window:close',
   WindowMinimize: 'window:minimize'
@@ -113,11 +115,17 @@ const api = {
   /** Lens results panel actions. */
   lens: {
     retry: () => ipcRenderer.invoke(IPC.LensRetry),
-    openWeb: () => ipcRenderer.invoke(IPC.LensOpenWeb),
     getCrop: () => ipcRenderer.invoke(IPC.ResultsGetCrop),
     analyze: () => ipcRenderer.invoke(IPC.ResultsAnalyze),
     closePanel: () => ipcRenderer.invoke(IPC.WindowClose),
     onError: (cb: Listener<unknown>) => subscribe('lens:error', cb)
+  },
+
+  /** Orb (minimized palette) controls. */
+  orb: {
+    open: () => ipcRenderer.invoke(IPC.OrbOpen),
+    dragStart: () => ipcRenderer.send(IPC.OrbDragStart),
+    dragMove: (dx: number, dy: number) => ipcRenderer.send(IPC.OrbDragMove, dx, dy)
   },
 
   /** Model switcher (palette). */

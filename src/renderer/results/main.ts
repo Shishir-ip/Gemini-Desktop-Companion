@@ -8,7 +8,6 @@ import type { ApiState, GeminiChunkPayload, GeminiErrorPayload, GeminiStatusPayl
 const status = document.getElementById('status') as HTMLElement
 const body = document.getElementById('body') as HTMLDivElement
 const cropThumb = document.getElementById('crop-thumb') as HTMLImageElement
-const btnLens = document.getElementById('btn-lens') as HTMLButtonElement
 const btnClose = document.getElementById('btn-close') as HTMLButtonElement
 
 let full = ''
@@ -24,13 +23,13 @@ async function init(): Promise<void> {
     return
   }
   cropThumb.src = crop
-  setStatus('Lens results opened in your browser', 'ok')
+  setStatus('Analyzing your selection…')
 
   // Gemini analysis streams alongside (skipped when not connected).
   try {
     const state = (await window.gdc.gemini.getState()) as { api: { hasKey: boolean } }
     if (!state.api.hasKey) {
-      setStatus('Lens opened in your browser — connect Gemini for AI analysis', 'ok')
+      setStatus('Connect Gemini first — open Settings or the palette banner', 'ok')
       return
     }
   } catch { /* fall through to analysis */ }
@@ -38,15 +37,6 @@ async function init(): Promise<void> {
   // Kick off the analysis (events arrive via the shared Gemini channels).
   void window.gdc.lens.analyze()
 
-  btnLens.addEventListener('click', () => {
-    btnLens.disabled = true
-    setStatus('Reopening Google Lens in your browser…')
-    void window.gdc.lens.openWeb().then((ok) => {
-      btnLens.disabled = false
-      if (!ok) setStatus('Lens upload failed — try again.', 'err')
-      else setStatus('Lens opened in your browser', 'ok')
-    })
-  })
   btnClose.addEventListener('click', () => void window.gdc.lens.closePanel())
 }
 

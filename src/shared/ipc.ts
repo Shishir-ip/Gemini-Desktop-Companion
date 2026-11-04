@@ -44,6 +44,9 @@ export const IPC = {
   // ── Generic ─────────────────────────────────────────────────────────────
   AppOpenExternal: 'app:open-external',
   AppStartCircle: 'app:start-circle',
+  OrbOpen: 'orb:open',
+  OrbDragStart: 'orb:drag-start',
+  OrbDragMove: 'orb:drag-move',
   AppShowWidget: 'app:show-widget',
   WindowClose: 'window:close',
   WindowMinimize: 'window:minimize'
