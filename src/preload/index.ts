@@ -16,6 +16,9 @@ const IPC = {
   CircleDismissAll: 'circle:dismiss-all',
   CircleSetLensMode: 'circle:set-lens-mode',
   LensRetry: 'lens:retry',
+  LensOpenWeb: 'lens:open-web',
+  ResultsGetCrop: 'results:get-crop',
+  ResultsAnalyze: 'results:analyze',
   GeminiGetState: 'gemini:get-state',
   GeminiSubmit: 'gemini:submit',
   GeminiAttachFromScreen: 'gemini:attach-from-screen',
@@ -107,10 +110,19 @@ const api = {
     onApiChanged: (cb: Listener<unknown>) => subscribe(IPC.ApiChanged, cb)
   },
 
-  /** Lens error panel actions. */
+  /** Lens results panel actions. */
   lens: {
     retry: () => ipcRenderer.invoke(IPC.LensRetry),
+    openWeb: () => ipcRenderer.invoke(IPC.LensOpenWeb),
+    getCrop: () => ipcRenderer.invoke(IPC.ResultsGetCrop),
+    analyze: () => ipcRenderer.invoke(IPC.ResultsAnalyze),
+    closePanel: () => ipcRenderer.invoke(IPC.WindowClose),
     onError: (cb: Listener<unknown>) => subscribe('lens:error', cb)
+  },
+
+  /** Model switcher (palette). */
+  models: {
+    setModel: (model: string) => ipcRenderer.invoke('gemini:set-model', model)
   },
 
   /** Generic helpers available to every window. */

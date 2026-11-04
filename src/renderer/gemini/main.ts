@@ -31,6 +31,8 @@ const apiBanner = document.getElementById('api-banner') as HTMLElement
 const apiKeyInput = document.getElementById('api-key-input') as HTMLInputElement
 const saveKeyBtn = document.getElementById('btn-save-key') as HTMLButtonElement
 const keyStatus = document.getElementById('api-key-status') as HTMLElement
+const chip38 = document.getElementById('chip-38') as HTMLButtonElement
+const chip35 = document.getElementById('chip-35') as HTMLButtonElement
 const getKeyBtn = document.getElementById('btn-getkey') as HTMLButtonElement
 const attachmentChip = document.getElementById('attachment-chip') as HTMLElement
 const attachmentThumb = document.getElementById('attachment-thumb') as HTMLImageElement
@@ -100,6 +102,20 @@ function setApiState(state: ApiState): void {
     prompt.placeholder = 'Ask Gemini anything…'
     autoSize()
   }
+  // Model chips reflect the active model.
+  chip38.classList.toggle('active', state.model === 'gemini-3.8-flash')
+  chip35.classList.toggle('active', state.model === 'gemini-3.5-flash-lite')
+}
+
+chip38.addEventListener('click', () => void switchModel('gemini-3.8-flash'))
+chip35.addEventListener('click', () => void switchModel('gemini-3.5-flash-lite'))
+
+async function switchModel(model: string): Promise<void> {
+  const res = (await window.gdc.models.setModel(model)) as {
+    ok: boolean
+    state: ApiState
+  }
+  if (res.ok) setApiState(res.state)
 }
 
 /* ── Events from main ──────────────────────────────────────────────────── */

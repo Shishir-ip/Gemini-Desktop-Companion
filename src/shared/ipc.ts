@@ -10,6 +10,9 @@ export const IPC = {
 
   // ── Lens panel ──────────────────────────────────────────────────────────
   LensRetry: 'lens:retry',
+  LensOpenWeb: 'lens:open-web',
+  ResultsGetCrop: 'results:get-crop',
+  ResultsAnalyze: 'results:analyze',
 
   // ── Gemini floating widget ──────────────────────────────────────────────
   GeminiGetState: 'gemini:get-state',

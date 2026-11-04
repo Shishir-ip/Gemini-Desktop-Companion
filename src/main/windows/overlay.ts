@@ -5,7 +5,7 @@ import type { CircleMode } from '../../shared/types'
 import { loadRendererPage, preloadPath } from '../paths'
 import { captureAllDisplays, type DisplayCapture } from '../screenshot'
 import { setPendingAttachment } from '../attachment'
-import { openLensPanel, closeLensPanel } from './lensPanel'
+import { openResultsPanel } from './resultsPanel'
 import { hideGeminiWidget, showGeminiWidget } from './geminiWidget'
 import { hideSettings } from './settingsWindow'
 import { log } from '../logger'
@@ -165,7 +165,7 @@ export function handleSelection(dataUrl: string, displayId: number): void {
     return
   }
 
-  log('[circle] selection captured — opening Google Lens panel')
+  log('[circle] selection captured — opening results panel')
   const display =
     screen.getAllDisplays().find((d) => d.id === displayId) ?? screen.getPrimaryDisplay()
   lensModeActive = true
@@ -174,7 +174,7 @@ export function handleSelection(dataUrl: string, displayId: number): void {
   for (const win of overlays.values()) {
     if (!win.isDestroyed()) win.webContents.send(IPC.CircleSetLensMode)
   }
-  openLensPanel(display, dataUrl)
+  openResultsPanel(display, dataUrl)
 }
 
 export function isLensModeActive(): boolean {
@@ -191,7 +191,7 @@ export function closeAllOverlays(): void {
 
 /** Esc / outside click — close panel + every overlay. */
 export function closeAllSearchUI(): void {
-  closeLensPanel(true)
+  void import('./resultsPanel').then(({ closePanel }) => closePanel(true))
   closeAllOverlays()
 }
 

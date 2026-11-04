@@ -5,17 +5,18 @@ import { searchLens } from '../gemini/lens'
 import { animateWindowBounds } from '../animate'
 import { loadRendererPage, preloadPath } from '../paths'
 import { log } from '../logger'
+import { IPC } from '../../shared/ipc'
 
 let panel: BrowserWindow | null = null
 let lastCrop: string | null = null
 
 /**
- * Android-style slide-out results panel anchored to the right edge of the
- * display where the selection happened. Uploads the crop to Google Lens,
- * loads the results page, then injects text-to-speech controls.
+ * Circle-to-Search results panel. Shows the crop, streams a Gemini vision
+ * analysis (the reliable API path), and offers "Open in Google Lens" as the
+ * classic fallback.
  */
-export function openLensPanel(display: Display, dataUrl: string): void {
-  closeLensPanel(true)
+export function openResultsPanel(display: Display, dataUrl: string): void {
+  closePanel(true)
   lastCrop = dataUrl
 
   const wa = display.workArea
@@ -59,19 +60,19 @@ export function openLensPanel(display: Display, dataUrl: string): void {
   })
   panel.webContents.on('before-input-event', (_event, input) => {
     if (input.type === 'keyDown' && input.key === 'Escape') {
-      // Delegate to the overlay module lazily to avoid an import cycle.
       void import('./overlay').then(({ closeAllSearchUI }) => closeAllSearchUI())
     }
   })
   panel.webContents.on('did-fail-load', (_event, code, desc, _url, isMainFrame) => {
     if (!isMainFrame) return
-    log(`[lens] panel shell load failed (${code} ${desc}) — closing search UI`)
+    log(`[results] panel load failed (${code} ${desc}) — closing search UI`)
     void import('./overlay').then(({ closeAllSearchUI }) => closeAllSearchUI())
   })
   panel.webContents.on('render-process-gone', (_event, details) => {
-    log(`[lens] panel renderer gone (${details.reason}) — closing search UI`)
+    log(`[results] panel renderer gone (${details.reason}) — closing search UI`)
     void import('./overlay').then(({ closeAllSearchUI }) => closeAllSearchUI())
   })
+  // TTS/read-aloud injection only applies once we navigate INTO Google Lens.
   panel.webContents.on('did-finish-load', () => {
     setTimeout(() => {
       if (panel && !panel.isDestroyed() && panel.webContents.getURL().includes('google.')) {
@@ -83,36 +84,33 @@ export function openLensPanel(display: Display, dataUrl: string): void {
     panel = null
   })
 
-  loadRendererPage(panel, 'lensError')
+  loadRendererPage(panel, 'results')
   panel.once('ready-to-show', () => {
     if (!panel || panel.isDestroyed()) return
     panel.show()
     animateWindowBounds(panel, start, target, 240)
   })
-
-  void uploadAndNavigate(dataUrl)
 }
 
-async function uploadAndNavigate(dataUrl: string): Promise<void> {
-  const result = await searchLens(dataUrl)
-  if (!panel || panel.isDestroyed()) return
+/** Navigate the panel into Google Lens for the stored crop. */
+export async function openLensForCrop(): Promise<boolean> {
+  if (!panel || panel.isDestroyed() || !lastCrop) return false
+  const result = await searchLens(lastCrop)
+  if (!panel || panel.isDestroyed()) return false
   if (result.ok) {
     await panel.loadURL(result.url).catch(() => {
       /* navigation errors are non-fatal — the page still renders */
     })
-  } else if (panel.webContents.getURL().includes('lensError')) {
-    panel.webContents.send('lens:error', { code: result.error })
+    return true
   }
+  return false
 }
 
-/** Retry the last failed Lens upload (from the error page). */
-export async function retryLensUpload(): Promise<boolean> {
-  if (!lastCrop || !panel || panel.isDestroyed()) return false
-  await uploadAndNavigate(lastCrop)
-  return true
+export function getLastCrop(): string | null {
+  return lastCrop
 }
 
-export function closeLensPanel(immediate = false): void {
+export function closePanel(immediate = false): void {
   if (!panel) return
   const p = panel
   panel = null
@@ -127,14 +125,26 @@ export function closeLensPanel(immediate = false): void {
   }, 200)
 }
 
-export function hasLensPanel(): boolean {
+export function hasResultsPanel(): boolean {
   return panel !== null && !panel!.isDestroyed()
 }
 
+export function getPanelWindow(): BrowserWindow | null {
+  return panel && !panel.isDestroyed() ? panel : null
+}
+
+/** Forward API streaming events into the results panel (if open). */
+export function forwardResultsEvent(channel: string, payload: unknown): void {
+  if (panel && !panel.isDestroyed()) {
+    panel.webContents.send(channel, payload)
+  }
+}
+
+export { IPC }
+
 /**
- * Injects speaker buttons next to substantial text blocks on the Google Lens
- * results page plus a floating "read all / stop" bar. Uses inline styles so
- * page CSP never blocks it; all handlers are addEventListener-based.
+ * Injects speaker buttons next to text blocks on the Google Lens page plus a
+ * floating "read all / stop" bar. Inline styles only; addEventListener-based.
  */
 const LENS_TTS_SCRIPT = `
 (function () {
@@ -204,7 +214,6 @@ const LENS_TTS_SCRIPT = `
     }
   }
 
-  // Floating read-all / stop bar
   var bar = document.createElement('div')
   bar.style.cssText = 'position:fixed;top:10px;right:10px;z-index:2147483647;display:flex;gap:6px;' +
     'font-family:system-ui,sans-serif;'

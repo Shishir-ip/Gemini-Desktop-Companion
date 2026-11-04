@@ -28,7 +28,7 @@ export default defineConfig({
           gemini: resolve(__dirname, 'src/renderer/gemini/index.html'),
           settings: resolve(__dirname, 'src/renderer/settings/index.html'),
           home: resolve(__dirname, 'src/renderer/home/index.html'),
-          lensError: resolve(__dirname, 'src/renderer/lensError/index.html')
+          results: resolve(__dirname, 'src/renderer/results/index.html')
         }
       }
     }

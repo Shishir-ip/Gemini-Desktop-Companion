@@ -16,7 +16,13 @@ import {
   startCircleToSearch,
   markOverlayReady
 } from './windows/overlay'
-import { retryLensUpload } from './windows/lensPanel'
+import {
+  openLensForCrop,
+  getLastCrop,
+  closePanel,
+  forwardResultsEvent,
+  getPanelWindow
+} from './windows/resultsPanel'
 import {
   hideGeminiWidget,
   showGeminiWidget,
@@ -28,21 +34,47 @@ import { log } from './logger'
 
 /**
  * Single place where every IPC channel is wired. API client events are
- * bridged to the floating widget here as well.
+ * bridged to the floating widget and the results panel here as well.
  */
 export function registerIpc(): void {
   const gemini = getGeminiSession()
 
-  gemini.on('status', (payload) => forwardGeminiEvent(IPC.GeminiStatus, payload))
-  gemini.on('chunk', (payload) => forwardGeminiEvent(IPC.GeminiChunk, payload))
-  gemini.on('done', (payload) => forwardGeminiEvent(IPC.GeminiDone, payload))
-  gemini.on('error', (payload) => forwardGeminiEvent(IPC.GeminiError, payload))
+  const forwardEvent = (channel: string, payload: unknown): void => {
+    forwardGeminiEvent(channel, payload)
+    forwardResultsEvent(channel, payload)
+  }
+
+  gemini.on('status', (payload) => forwardEvent(IPC.GeminiStatus, payload))
+  gemini.on('chunk', (payload) => forwardEvent(IPC.GeminiChunk, payload))
+  gemini.on('done', (payload) => forwardEvent(IPC.GeminiDone, payload))
+  gemini.on('error', (payload) => forwardEvent(IPC.GeminiError, payload))
 
   // ── Circle to Search ─────────────────────────────────────────────────
   registerOverlayIpc()
 
-  // ── Lens panel ───────────────────────────────────────────────────────
-  ipcMain.handle(IPC.LensRetry, async () => retryLensUpload())
+  // ── Results panel (Gemini vision + Lens fallback) ────────────────────
+  ipcMain.handle(IPC.LensOpenWeb, async () => openLensForCrop())
+  ipcMain.handle(IPC.ResultsGetCrop, () => getLastCrop())
+  ipcMain.handle(IPC.ResultsAnalyze, async () => {
+    const crop = getLastCrop()
+    if (!crop) return
+    const imageB64 = crop.replace(/^data:image\/\w+;base64,/, '')
+    await gemini.submitVision(
+      'You are Circle to Search. Analyze this screenshot region: transcribe any text exactly, identify objects, products, people, landmarks, apps, errors or code you see, then give a concise, useful summary in 2-5 short bullets. If it shows a question or an error message, answer or fix it. Stay under 180 words.',
+      imageB64
+    )
+  })
+  ipcMain.handle(IPC.WindowClose, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    // The results panel is a transient surface: close destroys it.
+    if (win && getPanelWindow() === win) closePanel(true)
+    else win?.close()
+  })
+  ipcMain.handle('gemini:set-model', (_event, model: string) => {
+    const error = gemini.setModel(String(model))
+    pushApiChanged()
+    return { ok: !error, error, state: gemini.getState() }
+  })
 
   // ── Gemini widget ────────────────────────────────────────────────────
   ipcMain.handle(IPC.GeminiGetState, () => ({
@@ -133,9 +165,6 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.AppOpenExternal, (_event, url: string) => openExternalUrl(url))
   ipcMain.handle(IPC.AppStartCircle, () => void startCircleToSearch('lens'))
   ipcMain.handle(IPC.AppShowWidget, () => showGeminiWidget())
-  ipcMain.handle(IPC.WindowClose, (event) => {
-    BrowserWindow.fromWebContents(event.sender)?.close()
-  })
   ipcMain.handle(IPC.WindowMinimize, (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize()
   })

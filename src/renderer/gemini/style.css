@@ -372,6 +372,31 @@ body.closing #input-card {
   padding-top: 9px;
   font-size: 11px;
 }
+.model-chips {
+  display: flex;
+  gap: 6px;
+}
+.model-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 200ms var(--ease-ios), color 200ms var(--ease-ios),
+    border-color 200ms var(--ease-ios);
+}
+.model-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.model-chip.active {
+  background: linear-gradient(135deg, rgba(79, 140, 255, 0.35), rgba(168, 85, 247, 0.35));
+  border-color: rgba(126, 166, 255, 0.6);
+  color: #fff;
+}
 .footer-hint kbd {
   font-family: inherit;
   font-size: 10px;
