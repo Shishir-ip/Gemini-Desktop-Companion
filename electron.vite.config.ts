@@ -6,10 +6,7 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: {
-        input: {
-          index: resolve(__dirname, 'src/main/index.ts'),
-          signinHelper: resolve(__dirname, 'src/main/auth/signinHelper.ts')
-        }
+        input: { index: resolve(__dirname, 'src/main/index.ts') }
       }
     }
   },
@@ -18,8 +15,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'src/preload/index.ts'),
-          geminiPage: resolve(__dirname, 'src/preload/geminiPage.ts')
+          index: resolve(__dirname, 'src/preload/index.ts')
         }
       }
     }

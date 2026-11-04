@@ -23,7 +23,7 @@ const IPC = {
   GeminiNewChat: 'gemini:new-chat',
   GeminiClose: 'gemini:close',
   WidgetSetIgnoreMouse: 'widget:set-ignore-mouse',
-  GeminiLoginChanged: 'gemini:login-changed',
+  GeminiApiChanged: 'gemini:api-changed',
   GeminiStatus: 'gemini:status',
   GeminiChunk: 'gemini:chunk',
   GeminiDone: 'gemini:done',
@@ -33,11 +33,12 @@ const IPC = {
   SettingsGetAll: 'settings:get-all',
   SettingsSetHotkeys: 'settings:set-hotkeys',
   SettingsSetStartup: 'settings:set-startup',
-  SettingsCheckLogin: 'settings:check-login',
-  SettingsOpenLogin: 'settings:open-login',
+  SettingsCheckApi: 'settings:check-api',
+  SettingsSetApiKey: 'settings:set-api-key',
+  SettingsClearApiKey: 'settings:clear-api-key',
+  SettingsOpenApiKeys: 'settings:open-apikeys',
   SettingsCheckUpdates: 'settings:check-updates',
-  SettingsOpenHistory: 'settings:open-history',
-  LoginChanged: 'login:changed',
+  ApiChanged: 'api:changed',
   AppOpenExternal: 'app:open-external',
   AppStartCircle: 'app:start-circle',
   AppShowWidget: 'app:show-widget',
@@ -74,13 +75,12 @@ const api = {
     removeAttachment: () => ipcRenderer.invoke(IPC.GeminiRemoveAttachment),
     newChat: () => ipcRenderer.invoke(IPC.GeminiNewChat),
     close: () => ipcRenderer.invoke(IPC.GeminiClose),
-    openHistory: () => ipcRenderer.invoke(IPC.SettingsOpenHistory),
     onStatus: (cb: Listener<unknown>) => subscribe(IPC.GeminiStatus, cb),
     onChunk: (cb: Listener<unknown>) => subscribe(IPC.GeminiChunk, cb),
     onDone: (cb: Listener<unknown>) => subscribe(IPC.GeminiDone, cb),
     onError: (cb: Listener<unknown>) => subscribe(IPC.GeminiError, cb),
     onAttachment: (cb: Listener<unknown>) => subscribe(IPC.GeminiAttachmentChanged, cb),
-    onLoginChanged: (cb: Listener<unknown>) => subscribe(IPC.GeminiLoginChanged, cb)
+    onApiChanged: (cb: Listener<unknown>) => subscribe(IPC.GeminiApiChanged, cb)
   },
 
   /**
@@ -99,11 +99,12 @@ const api = {
     setHotkeys: (hotkeys: { circleToSearch: string; holdToGemini: string }) =>
       ipcRenderer.invoke(IPC.SettingsSetHotkeys, hotkeys),
     setStartup: (enabled: boolean) => ipcRenderer.invoke(IPC.SettingsSetStartup, enabled),
-    checkLogin: () => ipcRenderer.invoke(IPC.SettingsCheckLogin),
-    openLogin: () => ipcRenderer.invoke(IPC.SettingsOpenLogin),
+    checkApi: () => ipcRenderer.invoke(IPC.SettingsCheckApi),
+    setApiKey: (key: string) => ipcRenderer.invoke(IPC.SettingsSetApiKey, key),
+    clearApiKey: () => ipcRenderer.invoke(IPC.SettingsClearApiKey),
+    openApiKeys: () => ipcRenderer.invoke(IPC.SettingsOpenApiKeys),
     checkUpdates: () => ipcRenderer.invoke(IPC.SettingsCheckUpdates),
-    openHistory: () => ipcRenderer.invoke(IPC.SettingsOpenHistory),
-    onLoginChanged: (cb: Listener<unknown>) => subscribe(IPC.LoginChanged, cb)
+    onApiChanged: (cb: Listener<unknown>) => subscribe(IPC.ApiChanged, cb)
   },
 
   /** Lens error panel actions. */

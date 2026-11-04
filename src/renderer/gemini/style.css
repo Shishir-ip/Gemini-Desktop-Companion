@@ -210,7 +210,7 @@ body.closing #input-card {
   flex: 1;
 }
 
-#signin-banner {
+#api-banner {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -220,7 +220,7 @@ body.closing #input-card {
   background: linear-gradient(135deg, rgba(79, 140, 255, 0.14), rgba(168, 85, 247, 0.14));
   border: 1px solid rgba(126, 166, 255, 0.35);
 }
-#signin-banner[hidden] {
+#api-banner[hidden] {
   display: none;
 }
 .signin-text {
@@ -240,9 +240,38 @@ body.closing #input-card {
   color: var(--text-secondary);
   line-height: 1.4;
 }
-#btn-signin {
-  padding: 7px 14px;
+.key-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+#api-key-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text-primary);
+  font-family: inherit;
   font-size: 12px;
+  outline: none;
+  user-select: text;
+}
+#api-key-input:focus {
+  border-color: rgba(126, 166, 255, 0.7);
+}
+.key-status {
+  font-size: 11px;
+  margin-top: 4px;
+}
+.key-status.err {
+  color: var(--danger);
+}
+.key-status.ok {
+  color: var(--success);
+}
+#btn-getkey {
   flex-shrink: 0;
 }
 

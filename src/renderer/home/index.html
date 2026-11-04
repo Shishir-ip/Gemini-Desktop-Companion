@@ -32,14 +32,19 @@
       </header>
 
       <main id="content">
-        <!-- Account -->
+        <!-- Gemini API -->
         <section id="account-card">
           <span id="account-dot" class="login-dot unknown"></span>
           <div class="account-text">
-            <span id="account-title">Checking Google session…</span>
-            <span id="account-sub">Chats save to your Gemini account history.</span>
+            <span id="account-title">Checking Gemini connection…</span>
+            <span id="account-sub">Gemini works with a free API key from Google AI Studio.</span>
+            <div id="key-row" hidden>
+              <input id="api-key-input" type="password" placeholder="Paste your AIza… key" spellcheck="false" autocomplete="off" />
+              <button id="btn-save-key" class="glass-btn glass-btn-primary">Connect</button>
+            </div>
+            <span id="key-status" class="key-status" hidden></span>
           </div>
-          <button id="btn-signin" class="glass-btn glass-btn-primary">Sign in with your browser</button>
+          <button id="btn-signin" class="glass-btn glass-btn-primary">Get API key</button>
         </section>
 
         <!-- Features -->
@@ -77,7 +82,7 @@
               <li>Press <kbd>Alt</kbd>+<kbd>Space</kbd> — the Gemini palette slides up</li>
               <li>Type your question, then press <kbd>Enter</kbd></li>
               <li>Want Gemini to see your screen? Click 📎 and select a region first</li>
-              <li><kbd>Alt</kbd>+<kbd>Space</kbd> or <kbd>Esc</kbd> hides it — chats stay in your Google history</li>
+              <li><kbd>Alt</kbd>+<kbd>Space</kbd> or <kbd>Esc</kbd> hides it — your conversation keeps its context</li>
             </ol>
             <button id="try-gemini" class="glass-btn">Try it now</button>
           </div>
@@ -95,7 +100,7 @@
           </div>
           <div class="basic-row">
             <span class="basic-icon">🔐</span>
-            <span><strong>Sign-in happens in your real browser</strong> (Edge/Chrome) — Google never blocks it, and the app picks the session up automatically.</span>
+            <span><strong>Connect once, works forever:</strong> create a free API key at aistudio.google.com/apikey (in your normal browser), paste it here — it's encrypted and stored on your PC.</span>
           </div>
         </section>
       </main>

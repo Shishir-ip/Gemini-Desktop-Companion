@@ -1,15 +1,14 @@
 import type {
+  ApiState,
   Attachment,
   GeminiChunkPayload,
   GeminiErrorPayload,
-  GeminiStatusPayload,
-  LoginState
+  GeminiStatusPayload
 } from '../../shared/types'
 
 /**
- * Floating Gemini command palette. Streams the background session's answer
- * live; keeps a single conversation per session so history accumulates in
- * the signed-in Google account.
+ * Floating Gemini command palette, powered by the official Gemini API
+ * (streaming SSE, native screenshot input, in-app conversation context).
  */
 
 const wrap = document.getElementById('wrap') as HTMLDivElement
@@ -22,11 +21,17 @@ const errorTitle = document.getElementById('error-title') as HTMLElement
 const errorMessage = document.getElementById('error-message') as HTMLElement
 const errorRetry = document.getElementById('error-retry') as HTMLButtonElement
 const errorSignin = document.getElementById('error-signin') as HTMLButtonElement
+const errorOpenGemini = document.getElementById('error-opengemini') as HTMLButtonElement
 const responseFooter = document.getElementById('response-footer') as HTMLElement
 const copyBtn = document.getElementById('btn-copy') as HTMLButtonElement
 const newChatBtn = document.getElementById('btn-newchat') as HTMLButtonElement
 const streamCursor = document.getElementById('stream-cursor') as HTMLElement
-const loginDot = document.getElementById('login-dot') as HTMLElement
+const apiDot = document.getElementById('api-dot') as HTMLElement
+const apiBanner = document.getElementById('api-banner') as HTMLElement
+const apiKeyInput = document.getElementById('api-key-input') as HTMLInputElement
+const saveKeyBtn = document.getElementById('btn-save-key') as HTMLButtonElement
+const keyStatus = document.getElementById('api-key-status') as HTMLElement
+const getKeyBtn = document.getElementById('btn-getkey') as HTMLButtonElement
 const attachmentChip = document.getElementById('attachment-chip') as HTMLElement
 const attachmentThumb = document.getElementById('attachment-thumb') as HTMLImageElement
 const attachmentSize = document.getElementById('attachment-size') as HTMLElement
@@ -35,18 +40,15 @@ const prompt = document.getElementById('prompt') as HTMLTextAreaElement
 const sendBtn = document.getElementById('btn-send') as HTMLButtonElement
 const attachBtn = document.getElementById('btn-attach') as HTMLButtonElement
 const closeBtn = document.getElementById('btn-close') as HTMLButtonElement
-const historyBtn = document.getElementById('btn-history') as HTMLButtonElement
 const settingsBtn = document.getElementById('btn-settings') as HTMLButtonElement
-const signinBanner = document.getElementById('signin-banner') as HTMLElement
-const signinBtn = document.getElementById('btn-signin') as HTMLButtonElement
-const errorOpenGemini = document.getElementById('error-opengemini') as HTMLButtonElement
 
 let attachment: Attachment | null = null
-let login: LoginState = { loggedIn: false, unknown: true }
+let api: ApiState = { hasKey: false, valid: false, model: '' }
 let lastPrompt = ''
 let lastError: GeminiErrorPayload | null = null
 let responseText = ''
 let hasResponse = false
+let lastCopyOk = false
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
 refreshState().catch(console.error)
@@ -61,12 +63,10 @@ async function refreshState(): Promise<void> {
   try {
     const state = (await window.gdc.gemini.getState()) as {
       attachment: Attachment | null
-      login: LoginState
+      api: ApiState
     }
     setAttachment(state.attachment)
-    setLogin(state.login)
-    // Fire-and-forget fresh login probe (also updates Settings if open).
-    void window.gdc.settings.checkLogin().then(setLogin).catch(() => {})
+    setApiState(state.api)
   } catch (err) {
     console.error('getState failed', err)
   }
@@ -85,21 +85,16 @@ function setAttachment(next: Attachment | null): void {
   attachmentChip.hidden = false
 }
 
-function setLogin(state: LoginState): void {
-  login = state
-  loginDot.className = 'login-dot ' + (state.unknown ? 'unknown' : state.loggedIn ? 'ok' : 'off')
-  loginDot.title = state.unknown
-    ? 'Google session: checking…'
-    : state.loggedIn
-      ? 'Google account connected — chats save to your history'
-      : 'Not signed in — click to sign in'
-  loginDot.onclick = () => void window.gdc.settings.openLogin()
-
-  const signedOut = !state.unknown && !state.loggedIn
-  signinBanner.hidden = !signedOut
-  prompt.disabled = signedOut
-  if (signedOut) {
-    prompt.placeholder = 'Sign in to start asking…'
+function setApiState(state: ApiState): void {
+  api = state
+  apiDot.className = 'login-dot ' + (state.hasKey && state.valid ? 'ok' : 'off')
+  apiDot.title = state.hasKey
+    ? `Gemini API connected (${state.model})`
+    : 'Gemini not connected — paste a free API key'
+  apiBanner.hidden = state.hasKey
+  prompt.disabled = !state.hasKey
+  if (!state.hasKey) {
+    prompt.placeholder = 'Connect Gemini to start asking…'
     sendBtn.disabled = true
   } else {
     prompt.placeholder = 'Ask Gemini anything…'
@@ -109,7 +104,7 @@ function setLogin(state: LoginState): void {
 
 /* ── Events from main ──────────────────────────────────────────────────── */
 window.gdc.gemini.onAttachment((payload) => setAttachment(payload as Attachment | null))
-window.gdc.gemini.onLoginChanged((payload) => setLogin(payload as LoginState))
+window.gdc.gemini.onApiChanged((payload) => setApiState(payload as ApiState))
 window.gdc.gemini.onStatus((payload) => {
   const p = payload as GeminiStatusPayload
   if (p.stage === 'working') {
@@ -145,10 +140,10 @@ window.gdc.gemini.onError((payload) => {
   streamCursor.hidden = true
   errorBox.hidden = false
   responseFooter.hidden = true
-  errorTitle.textContent = p.code === 'NOT_LOGGED_IN' ? 'Not signed in' : 'Something went wrong'
+  errorTitle.textContent = p.code === 'NO_API_KEY' ? 'Gemini is not connected' : 'Something went wrong'
   errorMessage.textContent = p.message
-  errorSignin.hidden = !p.needsLogin
-  errorOpenGemini.hidden = !(p.code === 'NO_RESPONSE' || p.code === 'SUBMIT_FAILED')
+  errorSignin.hidden = !p.needsKey
+  errorOpenGemini.hidden = false
 })
 
 /* ── Actions ───────────────────────────────────────────────────────────── */
@@ -164,10 +159,7 @@ prompt.addEventListener('input', autoSize)
 attachBtn.addEventListener('click', () => void window.gdc.gemini.attachFromScreen())
 removeAttachmentBtn.addEventListener('click', () => void window.gdc.gemini.removeAttachment())
 closeBtn.addEventListener('click', close)
-historyBtn.addEventListener('click', () => void window.gdc.gemini.openHistory())
 settingsBtn.addEventListener('click', () => void window.gdc.settings.open())
-signinBtn.addEventListener('click', () => void window.gdc.settings.openLogin())
-errorOpenGemini.addEventListener('click', () => void window.gdc.gemini.openHistory())
 newChatBtn.addEventListener('click', () => {
   responseText = ''
   hasResponse = false
@@ -190,7 +182,60 @@ errorRetry.addEventListener('click', () => {
   hideError()
   if (lastPrompt) submit(lastPrompt, true)
 })
-errorSignin.addEventListener('click', () => void window.gdc.settings.openLogin())
+errorSignin.addEventListener('click', () => {
+  hideError()
+  apiBanner.hidden = false
+  apiKeyInput.focus()
+})
+errorOpenGemini.addEventListener('click', () => {
+  void window.gdc.openExternal('https://aistudio.google.com/apikey')
+})
+getKeyBtn.addEventListener('click', () => {
+  void window.gdc.openExternal('https://aistudio.google.com/apikey')
+})
+saveKeyBtn.addEventListener('click', () => void saveKey())
+apiKeyInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') void saveKey()
+})
+
+async function saveKey(): Promise<void> {
+  const key = apiKeyInput.value.trim()
+  if (!key) {
+    keyStatus.hidden = false
+    keyStatus.className = 'key-status err'
+    keyStatus.textContent = 'Paste the key first.'
+    return
+  }
+  saveKeyBtn.disabled = true
+  keyStatus.hidden = false
+  keyStatus.className = 'key-status ok'
+  keyStatus.textContent = 'Validating…'
+  try {
+    const res = (await window.gdc.settings.setApiKey(key)) as {
+      ok: boolean
+      error?: string
+      state: ApiState
+    }
+    if (res.ok) {
+      keyStatus.className = 'key-status ok'
+      keyStatus.textContent = 'Connected ✓'
+      setApiState(res.state)
+      setTimeout(() => {
+        apiBanner.hidden = true
+        prompt.focus()
+      }, 700)
+    } else {
+      keyStatus.className = 'key-status err'
+      keyStatus.textContent = res.error ?? 'Could not validate the key.'
+      setApiState(res.state)
+    }
+  } catch (err) {
+    keyStatus.className = 'key-status err'
+    keyStatus.textContent = String(err)
+  } finally {
+    saveKeyBtn.disabled = false
+  }
+}
 
 // Click on the empty area around the sheet closes the widget (iOS behavior).
 // NOTE: the window is OS-level click-through outside the glass cards, so
@@ -225,11 +270,9 @@ window.addEventListener('keydown', (e) => {
   }
 })
 
-let lastCopyOk = false
-
 async function submit(forceText?: string, isRetry = false): Promise<void> {
-  if (login && !login.unknown && !login.loggedIn) {
-    showError('NOT_LOGGED_IN', 'Sign in with Google first — signed-out Gemini is rate-limited and saves no history.')
+  if (!api.hasKey) {
+    showError('NO_API_KEY', 'Connect Gemini first — paste a free API key from aistudio.google.com/apikey.')
     return
   }
   const text = (forceText ?? prompt.value).trim()
@@ -238,9 +281,8 @@ async function submit(forceText?: string, isRetry = false): Promise<void> {
   prompt.value = ''
   autoSize()
   hideError()
-  showThinking(attachment ? 'Uploading screenshot…' : 'Thinking…')
+  showThinking(attachment ? 'Reading your screenshot…' : 'Thinking…')
 
-  // Ensure the response card is visible before first chunk arrives.
   if (!hasResponse) stream.innerHTML = ''
   responseCard.hidden = false
   scrollToBottom()
@@ -249,7 +291,7 @@ async function submit(forceText?: string, isRetry = false): Promise<void> {
     await window.gdc.gemini.submit(text)
   } catch (err) {
     hideThinking()
-    showError('SUBMIT_FAILED', 'Could not reach Gemini. Make sure you are signed in and try again.')
+    showError('SUBMIT_FAILED', 'Could not reach the Gemini API. Check your connection and try again.')
     console.error(err)
   }
 }
@@ -267,11 +309,12 @@ function hideThinking(): void {
   thinking.hidden = true
 }
 function showError(code: string, message: string): void {
-  lastError = { code, message, needsLogin: code === 'NOT_LOGGED_IN' }
+  lastError = { code, message, needsKey: code === 'NO_API_KEY' }
   errorBox.hidden = false
-  errorTitle.textContent = code === 'NOT_LOGGED_IN' ? 'Not signed in' : 'Something went wrong'
+  errorTitle.textContent = code === 'NO_API_KEY' ? 'Gemini is not connected' : 'Something went wrong'
   errorMessage.textContent = message
-  errorSignin.hidden = !lastError.needsLogin
+  errorSignin.hidden = !lastError.needsKey
+  errorOpenGemini.hidden = code === 'NO_API_KEY'
   responseCard.hidden = false
 }
 function hideError(): void {
@@ -317,7 +360,6 @@ function renderMarkdown(src: string): string {
     /\[([^\]]+)\]\((https?:[^)\s]+)\)/g,
     '<a data-href="$2">$1</a>'
   )
-  // Bullet lists
   text = text.replace(
     /(?:^|\n)((?:[-*•]\s+[^\n]+\n?)+)/g,
     (_m, block: string) =>
@@ -329,7 +371,6 @@ function renderMarkdown(src: string): string {
         .join('') +
       '</ul>'
   )
-  // Numbered lists
   text = text.replace(
     /(?:^|\n)((?:\d+[.)]\s+[^\n]+\n?)+)/g,
     (_m, block: string) =>

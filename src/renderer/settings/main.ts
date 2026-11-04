@@ -1,5 +1,5 @@
 import type {
-  LoginState,
+  ApiState,
   RegistrationStatus,
   SetHotkeysResponse,
   SettingsAllResponse
@@ -24,7 +24,11 @@ const toggleStartup = document.getElementById('toggle-startup') as HTMLElement
 const accountTitle = document.getElementById('account-title') as HTMLElement
 const accountSub = document.getElementById('account-sub') as HTMLElement
 const btnLogin = document.getElementById('btn-login') as HTMLButtonElement
-const btnHistory = document.getElementById('btn-history') as HTMLButtonElement
+const keyRow = document.getElementById('key-row') as HTMLElement
+const apiKeyInput = document.getElementById('api-key-input') as HTMLInputElement
+const saveKeyBtn = document.getElementById('btn-save-key') as HTMLButtonElement
+const keyStatus = document.getElementById('key-status') as HTMLElement
+const modelSub = document.getElementById('model-sub') as HTMLElement
 const btnUpdates = document.getElementById('btn-updates') as HTMLButtonElement
 const updateSub = document.getElementById('update-sub') as HTMLElement
 const btnGithub = document.getElementById('btn-github') as HTMLButtonElement
@@ -47,8 +51,7 @@ async function loadAll(): Promise<void> {
   hkGemini.textContent = formatAccelerator(current.hotkeys.holdToGemini)
   setStartupToggle(current.startup)
   applyRegistration(current.registration)
-  setLogin(current.login)
-  void window.gdc.settings.checkLogin().then(setLogin).catch(() => {})
+  applyApi(current.api)
 }
 
 function applyRegistration(reg: RegistrationStatus): void {
@@ -236,31 +239,69 @@ toggleStartup.addEventListener('keydown', (e) => {
   }
 })
 
-/* ── Account ───────────────────────────────────────────────────────────── */
-function setLogin(state: LoginState): void {
-  if (state.unknown) {
-    accountTitle.textContent = 'Checking Google session…'
-    accountSub.textContent = 'Making sure your Gemini session is alive.'
-    btnLogin.textContent = 'Sign in'
-    btnLogin.disabled = true
-  } else if (state.loggedIn) {
-    accountTitle.textContent = 'Google account connected'
-    accountSub.textContent =
-      'Every chat — typed prompts and screen selections — is saved to your Gemini history.'
-    btnLogin.textContent = 'Manage session'
+/* ── Gemini API ─────────────────────────────────────────────────────────── */
+function applyApi(state: ApiState): void {
+  const connected = state.hasKey
+  if (connected) {
+    accountTitle.textContent = 'Gemini API connected'
+    accountSub.textContent = `Streaming via the official API (${state.model}). The key is encrypted on this PC.`
+    btnLogin.textContent = 'Manage key'
     btnLogin.disabled = false
+    keyRow.hidden = true
+    keyStatus.hidden = true
   } else {
-    accountTitle.textContent = 'Not signed in'
-    accountSub.textContent = 'Sign in with Google so chats save to your account history.'
-    btnLogin.textContent = 'Sign in'
+    accountTitle.textContent = 'Not connected'
+    accountSub.textContent = 'Create a free key at aistudio.google.com/apikey, then paste it here.'
+    btnLogin.textContent = 'Get API key'
     btnLogin.disabled = false
+    keyRow.hidden = false
+  }
+  modelSub.textContent = state.model || 'gemini-2.5-flash'
+}
+
+async function saveKey(): Promise<void> {
+  const key = apiKeyInput.value.trim()
+  if (!key) {
+    keyStatus.hidden = false
+    keyStatus.className = 'key-status err'
+    keyStatus.textContent = 'Paste the key first.'
+    return
+  }
+  saveKeyBtn.disabled = true
+  keyStatus.hidden = false
+  keyStatus.className = 'key-status ok'
+  keyStatus.textContent = 'Validating…'
+  try {
+    const res = (await window.gdc.settings.setApiKey(key)) as {
+      ok: boolean
+      error?: string
+      state: ApiState
+    }
+    keyStatus.hidden = false
+    if (res.ok) {
+      keyStatus.className = 'key-status ok'
+      keyStatus.textContent = 'Connected ✓'
+      applyApi(res.state)
+    } else {
+      keyStatus.className = 'key-status err'
+      keyStatus.textContent = res.error ?? 'Could not validate the key.'
+      applyApi(res.state)
+    }
+  } catch (err) {
+    keyStatus.className = 'key-status err'
+    keyStatus.textContent = String(err)
+  } finally {
+    saveKeyBtn.disabled = false
   }
 }
 
-btnLogin.addEventListener('click', () => void window.gdc.settings.openLogin())
-btnHistory.addEventListener('click', () => void window.gdc.settings.openHistory())
+btnLogin.addEventListener('click', () => void window.gdc.settings.openApiKeys())
+saveKeyBtn.addEventListener('click', () => void saveKey())
+apiKeyInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') void saveKey()
+})
 
-window.gdc.settings.onLoginChanged((payload) => setLogin(payload as LoginState))
+window.gdc.settings.onApiChanged((payload) => applyApi(payload as ApiState))
 
 /* ── About ─────────────────────────────────────────────────────────────── */
 btnUpdates.addEventListener('click', () => {

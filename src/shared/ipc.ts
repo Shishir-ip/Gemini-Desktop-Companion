@@ -19,7 +19,7 @@ export const IPC = {
   GeminiNewChat: 'gemini:new-chat',
   GeminiClose: 'gemini:close',
   WidgetSetIgnoreMouse: 'widget:set-ignore-mouse',
-  GeminiLoginChanged: 'gemini:login-changed', // main → widget renderer
+  GeminiApiChanged: 'gemini:api-changed', // main → widget renderer
   GeminiStatus: 'gemini:status', // main → renderer
   GeminiChunk: 'gemini:chunk', // main → renderer
   GeminiDone: 'gemini:done', // main → renderer
@@ -31,19 +31,17 @@ export const IPC = {
   SettingsGetAll: 'settings:get-all',
   SettingsSetHotkeys: 'settings:set-hotkeys',
   SettingsSetStartup: 'settings:set-startup',
-  SettingsCheckLogin: 'settings:check-login',
-  SettingsOpenLogin: 'settings:open-login',
+  SettingsCheckApi: 'settings:check-api',
+  SettingsSetApiKey: 'settings:set-api-key',
+  SettingsClearApiKey: 'settings:clear-api-key',
+  SettingsOpenApiKeys: 'settings:open-apikeys',
   SettingsCheckUpdates: 'settings:check-updates',
-  SettingsOpenHistory: 'settings:open-history',
-  LoginChanged: 'login:changed', // main → settings renderer
+  ApiChanged: 'api:changed', // main → UIs
 
   // ── Generic ─────────────────────────────────────────────────────────────
   AppOpenExternal: 'app:open-external',
   AppStartCircle: 'app:start-circle',
   AppShowWidget: 'app:show-widget',
   WindowClose: 'window:close',
-  WindowMinimize: 'window:minimize',
-
-  // ── Hidden Gemini web page bridge ───────────────────────────────────────
-  GeminiPageStream: 'gemini:page-stream'
+  WindowMinimize: 'window:minimize'
 } as const

@@ -1,9 +1,8 @@
-import type { LoginState, SettingsAllResponse } from '../../shared/types'
+import type { ApiState, SettingsAllResponse } from '../../shared/types'
 
 /**
- * Home interface logic: account status, "Try it now" launches, and links
- * into Settings. State arrives via the shared settings:get-all channel and
- * login pushes.
+ * Home interface logic: Gemini API connection, "Try it now" launches, and
+ * links into Settings. State arrives via the shared settings:get-all channel.
  */
 
 const versionBadge = document.getElementById('version-badge') as HTMLElement
@@ -13,18 +12,20 @@ const btnClose = document.getElementById('btn-close') as HTMLButtonElement
 const accountDot = document.getElementById('account-dot') as HTMLElement
 const accountTitle = document.getElementById('account-title') as HTMLElement
 const accountSub = document.getElementById('account-sub') as HTMLElement
+const keyRow = document.getElementById('key-row') as HTMLElement
+const apiKeyInput = document.getElementById('api-key-input') as HTMLInputElement
+const saveKeyBtn = document.getElementById('btn-save-key') as HTMLButtonElement
+const keyStatus = document.getElementById('key-status') as HTMLElement
 const btnSignin = document.getElementById('btn-signin') as HTMLButtonElement
 const tryCircle = document.getElementById('try-circle') as HTMLButtonElement
 const tryGemini = document.getElementById('try-gemini') as HTMLButtonElement
 
-let current: SettingsAllResponse | null = null
-
 loadAll().catch(console.error)
-void window.gdc.settings.checkLogin().then((s) => applyLogin(s as LoginState)).catch(() => {})
-window.gdc.settings.onLoginChanged((payload) => applyLogin(payload as LoginState))
+void window.gdc.settings.checkApi().then((s) => applyApi(s as ApiState)).catch(() => {})
+window.gdc.settings.onApiChanged((payload) => applyApi(payload as ApiState))
 
 async function loadAll(): Promise<void> {
-  current = (await window.gdc.settings.getAll()) as SettingsAllResponse
+  const current = (await window.gdc.settings.getAll()) as SettingsAllResponse
   versionBadge.textContent = `v${current.version}`
   const hk = current.hotkeys
   // Keep shortcut chips in sync with user preferences.
@@ -36,30 +37,70 @@ async function loadAll(): Promise<void> {
       .join('<span class="plus">+</span>')
   if (chips[0]) chips[0].innerHTML = kbd(hk.circleToSearch)
   if (chips[1]) chips[1].innerHTML = kbd(hk.holdToGemini)
-  applyLogin(current.login)
+  applyApi(current.api)
 }
 
-function applyLogin(state: LoginState): void {
-  accountDot.className = 'login-dot ' + (state.unknown ? 'unknown' : state.loggedIn ? 'ok' : 'off')
-  if (state.unknown) {
-    accountTitle.textContent = 'Checking Google session…'
-    accountSub.textContent = 'Chats save to your Gemini account history.'
-    btnSignin.hidden = true
-  } else if (state.loggedIn) {
-    accountTitle.textContent = 'Google account connected'
-    accountSub.textContent = 'Every chat is saved to your Gemini history. You are all set.'
-    btnSignin.hidden = true
+function applyApi(state: ApiState): void {
+  accountDot.className = 'login-dot ' + (state.hasKey ? 'ok' : 'off')
+  if (state.hasKey) {
+    accountTitle.textContent = 'Gemini connected'
+    accountSub.textContent = `Streaming via the official API (${state.model}). Conversations keep their context in the palette.`
+    keyRow.hidden = true
+    keyStatus.hidden = true
+    btnSignin.textContent = 'Manage key'
+    btnSignin.onclick = () => void window.gdc.settings.openApiKeys()
   } else {
-    accountTitle.textContent = 'One step left: sign in with Google'
-    accountSub.textContent = 'Your real browser opens for the sign-in — the app picks the session up automatically.'
-    btnSignin.hidden = false
+    accountTitle.textContent = 'Connect Gemini — one free key, 30 seconds'
+    accountSub.textContent = '1. Click "Get API key" · 2. Create it in your browser · 3. Paste it here.'
+    keyRow.hidden = false
+    btnSignin.textContent = 'Get API key'
+    btnSignin.onclick = () => void window.gdc.settings.openApiKeys()
   }
 }
 
-btnSignin.addEventListener('click', () => void window.gdc.settings.openLogin())
+btnSignin.addEventListener('click', () => void window.gdc.settings.openApiKeys())
 btnSettings.addEventListener('click', () => void window.gdc.settings.open())
 btnMinimize.addEventListener('click', () => void window.gdc.win.minimize())
 btnClose.addEventListener('click', () => window.close())
+
+saveKeyBtn.addEventListener('click', () => void saveKey())
+apiKeyInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') void saveKey()
+})
+
+async function saveKey(): Promise<void> {
+  const key = apiKeyInput.value.trim()
+  if (!key) {
+    keyStatus.hidden = false
+    keyStatus.className = 'key-status err'
+    keyStatus.textContent = 'Paste the key first.'
+    return
+  }
+  saveKeyBtn.disabled = true
+  keyStatus.hidden = false
+  keyStatus.className = 'key-status ok'
+  keyStatus.textContent = 'Validating…'
+  try {
+    const res = (await window.gdc.settings.setApiKey(key)) as {
+      ok: boolean
+      error?: string
+      state: ApiState
+    }
+    if (res.ok) {
+      keyStatus.className = 'key-status ok'
+      keyStatus.textContent = 'Connected ✓ — try Hold to Gemini now!'
+      applyApi(res.state)
+    } else {
+      keyStatus.className = 'key-status err'
+      keyStatus.textContent = res.error ?? 'Could not validate the key.'
+    }
+  } catch (err) {
+    keyStatus.className = 'key-status err'
+    keyStatus.textContent = String(err)
+  } finally {
+    saveKeyBtn.disabled = false
+  }
+}
 
 tryCircle.addEventListener('click', () => {
   window.close()

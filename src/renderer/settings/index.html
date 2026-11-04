@@ -79,23 +79,28 @@
           </div>
         </section>
 
-        <!-- Account -->
+        <!-- Gemini API -->
         <section>
-          <h2 class="section-title">Google Account</h2>
+          <h2 class="section-title">Gemini API</h2>
           <div class="group">
             <div class="row">
               <div class="row-text">
-                <span class="row-title" id="account-title">Checking session…</span>
-                <span class="row-sub" id="account-sub">Your Gemini chats are saved to your account history.</span>
+                <span class="row-title" id="account-title">Checking connection…</span>
+                <span class="row-sub" id="account-sub">Gemini runs on the official API — free tier included.</span>
+                <div id="key-row" hidden>
+                  <input id="api-key-input" type="password" placeholder="Paste your AIza… key" spellcheck="false" autocomplete="off" />
+                  <button id="btn-save-key" class="glass-btn glass-btn-primary">Save &amp; validate</button>
+                </div>
+                <span id="key-status" class="key-status" hidden></span>
               </div>
-              <button id="btn-login" class="glass-btn glass-btn-primary">Sign in</button>
+              <button id="btn-login" class="glass-btn glass-btn-primary">Get API key</button>
             </div>
             <div class="row">
               <div class="row-text">
-                <span class="row-title">Gemini history</span>
-                <span class="row-sub">Open your full conversation history in the in-app session</span>
+                <span class="row-title">Model</span>
+                <span class="row-sub" id="model-sub">gemini-2.5-flash</span>
               </div>
-              <button id="btn-history" class="glass-btn">Open</button>
+              <span class="hotkey-static">free tier</span>
             </div>
           </div>
         </section>

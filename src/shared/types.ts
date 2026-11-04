@@ -27,11 +27,12 @@ export interface CapturePayload {
   mode: CircleMode
 }
 
-export interface LoginState {
-  /** Best-effort: true when Google account cookies detected */
-  loggedIn: boolean
-  /** true when we could not determine the state (page still loading, etc.) */
-  unknown: boolean
+export interface ApiState {
+  /** A key is stored locally */
+  hasKey: boolean
+  /** The key passed validation at least once */
+  valid: boolean
+  model: string
 }
 
 export interface RegistrationStatus {
@@ -45,7 +46,7 @@ export interface SettingsAllResponse {
   hotkeys: Hotkeys
   registration: RegistrationStatus
   startup: boolean
-  login: LoginState
+  api: ApiState
   isDev: boolean
 }
 
@@ -71,5 +72,5 @@ export interface GeminiChunkPayload {
 export interface GeminiErrorPayload {
   code: string
   message: string
-  needsLogin?: boolean
+  needsKey?: boolean
 }

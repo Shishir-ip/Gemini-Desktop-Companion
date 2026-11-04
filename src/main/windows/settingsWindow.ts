@@ -1,10 +1,9 @@
 import { BrowserWindow } from 'electron'
 import { IPC } from '../../shared/ipc'
-import type { LoginState } from '../../shared/types'
 import { loadRendererPage, preloadPath } from '../paths'
-import { getGeminiSession } from '../gemini/session'
 import { log } from '../logger'
 import { forwardGeminiEvent } from './geminiWidget'
+import { getGeminiSession } from '../gemini/session'
 
 let settings: BrowserWindow | null = null
 
@@ -74,19 +73,12 @@ export function getSettingsWindow(): BrowserWindow | null {
   return settings && !settings.isDestroyed() ? settings : null
 }
 
-/** Broadcast a fresh login state to Settings AND the Gemini palette. */
-export function pushLoginChanged(): void {
-  const state = getGeminiSession().getCachedLoginState()
+/** Broadcast a fresh API state to Settings AND the Gemini palette. */
+export function pushApiChanged(): void {
+  const state = getGeminiSession().getState()
   const win = getSettingsWindow()
   if (win) {
-    win.webContents.send(IPC.LoginChanged, state)
+    win.webContents.send(IPC.ApiChanged, state)
   }
-  forwardGeminiEvent(IPC.GeminiLoginChanged, state)
+  forwardGeminiEvent(IPC.GeminiApiChanged, state)
 }
-
-/** "Open Gemini history / full session" — reveals the persistent window. */
-export async function openGeminiVisible(): Promise<void> {
-  await getGeminiSession().openVisible()
-}
-
-export type { LoginState }

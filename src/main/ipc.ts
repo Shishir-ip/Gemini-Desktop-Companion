@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain } from 'electron'
+import { BrowserWindow, app, ipcMain, shell } from 'electron'
 import { IPC } from '../shared/ipc'
 import type { Hotkeys, SetHotkeysResponse } from '../shared/types'
 import { store, getSettings } from './store'
@@ -23,25 +23,20 @@ import {
   forwardGeminiEvent,
   setWidgetIgnoreMouse
 } from './windows/geminiWidget'
-import { openGeminiVisible, openSettings, pushLoginChanged } from './windows/settingsWindow'
-import { openLoginWindow } from './auth/browserSignIn'
+import { openSettings, pushApiChanged } from './windows/settingsWindow'
 import { log } from './logger'
 
 /**
- * Single place where every IPC channel is wired. Session events are bridged
- * to the floating widget here as well.
+ * Single place where every IPC channel is wired. API client events are
+ * bridged to the floating widget here as well.
  */
 export function registerIpc(): void {
-  const session = getGeminiSession()
+  const gemini = getGeminiSession()
 
-  session.on('status', (payload) => forwardGeminiEvent(IPC.GeminiStatus, payload))
-  session.on('chunk', (payload) => forwardGeminiEvent(IPC.GeminiChunk, payload))
-  session.on('done', (payload) => forwardGeminiEvent(IPC.GeminiDone, payload))
-  session.on('error', (payload) => forwardGeminiEvent(IPC.GeminiError, payload))
-
-  ipcMain.on(IPC.GeminiPageStream, (_event, payload: { full: string; done: boolean }) => {
-    session.handleStream(payload.full, payload.done)
-  })
+  gemini.on('status', (payload) => forwardGeminiEvent(IPC.GeminiStatus, payload))
+  gemini.on('chunk', (payload) => forwardGeminiEvent(IPC.GeminiChunk, payload))
+  gemini.on('done', (payload) => forwardGeminiEvent(IPC.GeminiDone, payload))
+  gemini.on('error', (payload) => forwardGeminiEvent(IPC.GeminiError, payload))
 
   // ── Circle to Search ─────────────────────────────────────────────────
   registerOverlayIpc()
@@ -52,7 +47,7 @@ export function registerIpc(): void {
   // ── Gemini widget ────────────────────────────────────────────────────
   ipcMain.handle(IPC.GeminiGetState, () => ({
     attachment: getPendingAttachment(),
-    login: session.getCachedLoginState(),
+    api: gemini.getState(),
     mode: getCircleMode()
   }))
   ipcMain.handle(IPC.GeminiSubmit, async (_event, text: string) => {
@@ -65,12 +60,11 @@ export function registerIpc(): void {
     clearPendingAttachment()
     log(`[gemini] submitting prompt (${prompt.length} chars, image: ${!!imageB64})`)
     try {
-      await session.submit(prompt || 'Describe this screenshot.', imageB64)
+      await gemini.submit(prompt || 'Describe this screenshot.', imageB64)
     } catch (err) {
-      session.emit('error', {
+      gemini.emit('error', {
         code: 'SUBMIT_FAILED',
-        message: 'Could not reach Gemini. Make sure you are signed in and try again.',
-        needsLogin: true
+        message: 'Could not reach the Gemini API. Check your connection and try again.'
       })
       console.error('[ipc] submit failed:', err)
     }
@@ -80,7 +74,7 @@ export function registerIpc(): void {
     void startCircleToSearch('attach')
   })
   ipcMain.handle(IPC.GeminiRemoveAttachment, () => clearPendingAttachment())
-  ipcMain.handle(IPC.GeminiNewChat, () => session.newChat())
+  ipcMain.handle(IPC.GeminiNewChat, () => gemini.resetChat())
   ipcMain.handle(IPC.GeminiClose, () => hideGeminiWidget())
   ipcMain.handle(IPC.WidgetSetIgnoreMouse, (_event, ignore: boolean) => {
     setWidgetIgnoreMouse(Boolean(ignore))
@@ -92,7 +86,7 @@ export function registerIpc(): void {
     hotkeys: getSettings().hotkeys,
     registration: registrationStatus,
     startup: isLaunchAtStartup(),
-    login: session.getCachedLoginState(),
+    api: gemini.getState(),
     isDev: !app.isPackaged
   }))
   ipcMain.handle(
@@ -115,15 +109,25 @@ export function registerIpc(): void {
     applyLaunchAtStartup(Boolean(enabled))
     return isLaunchAtStartup()
   })
-  ipcMain.handle(IPC.SettingsCheckLogin, async () => {
-    const state = await session.refreshLoginState()
-    pushLoginChanged()
+  ipcMain.handle(IPC.SettingsCheckApi, async () => {
+    const state = gemini.getState()
     return state
   })
-  ipcMain.handle(IPC.SettingsOpenLogin, () => openLoginWindow())
+  ipcMain.handle(IPC.SettingsSetApiKey, async (_event, key: string) => {
+    const error = await gemini.setApiKey(typeof key === 'string' ? key : '')
+    pushApiChanged()
+    return { ok: !error, error, state: gemini.getState() }
+  })
+  ipcMain.handle(IPC.SettingsClearApiKey, () => {
+    void gemini.clearApiKey()
+    pushApiChanged()
+    return gemini.getState()
+  })
+  ipcMain.handle(IPC.SettingsOpenApiKeys, () => {
+    void shell.openExternal('https://aistudio.google.com/apikey')
+  })
   ipcMain.handle(IPC.SettingsOpen, () => openSettings())
   ipcMain.handle(IPC.SettingsCheckUpdates, () => checkForUpdates(true))
-  ipcMain.handle(IPC.SettingsOpenHistory, () => openGeminiVisible())
 
   // ── Generic window helpers ───────────────────────────────────────────
   ipcMain.handle(IPC.AppOpenExternal, (_event, url: string) => openExternalUrl(url))
@@ -140,8 +144,4 @@ export function registerIpc(): void {
   ipcMain.handle('circle:outside-click', () => {
     if (isLensModeActive()) closeAllSearchUI()
   })
-
-  // Keep a reference so showGeminiWidget stays reachable for tray.
-  void showGeminiWidget
-  void openSettings
 }

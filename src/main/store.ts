@@ -6,6 +6,9 @@ export type StoreSchema = {
   hotkeys: Hotkeys
   launchAtStartup: boolean
   welcomed: boolean
+  /** safeStorage-encrypted Gemini API key (base64) */
+  apiKeyEnc?: string
+  apiModel?: string
 }
 
 export const DEFAULT_HOTKEYS: Hotkeys = {

@@ -21,7 +21,7 @@ app.setName('Gemini Desktop Companion')
 app.disableHardwareAcceleration()
 
 // The app is a background tray daemon: launching a second instance simply
-// reveals the Gemini widget in the first one.
+// reveals the Home window in the first one.
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
@@ -40,10 +40,9 @@ if (!app.requestSingleInstanceLock()) {
 
     nativeTheme.themeSource = 'dark'
 
-    // Chrome-like user agent so Google serves full pages (login + Gemini).
+    // Chrome-like user agent for the Lens results panel.
     applyGoogleFriendlyUserAgents()
-    // No web notifications from the hidden Gemini/Lens sessions — responses
-    // must stream into the palette, never leak as Windows toasts.
+    // No web notifications from the Lens session — results stay in the panel.
     applyPermissionGuards()
 
     registerIpc()
@@ -58,13 +57,13 @@ if (!app.requestSingleInstanceLock()) {
     // Keep the OS login item in sync with the stored preference.
     applyLaunchAtStartup(store.get('launchAtStartup'))
 
-    // Warm up the hidden Gemini session so the first Hold-to-Gemini is instant.
+    // Validate the stored API key in the background (instant first ask).
     setTimeout(() => {
       void getGeminiSession().preload()
-    }, 3000)
+    }, 2000)
 
-    // Diagnostic opener: `--gdc-open=circle|widget|settings|home` shows a
-    // page right after startup (used by scripts/verify-ui.mjs and support).
+    // Diagnostic opener: `--gdc-open=<page>` shows a page right after startup
+    // (used by scripts/verify-ui.mjs and support).
     const openArg = process.argv.find((a) => a.startsWith('--gdc-open='))
     if (openArg) {
       const page = openArg.split('=')[1] ?? 'home'
@@ -77,13 +76,13 @@ if (!app.requestSingleInstanceLock()) {
       }, 1500)
     } else if (manualLaunch) {
       // Always land on the Home interface: it explains the features, the
-      // shortcuts and the account status — nothing is hidden in the tray.
+      // shortcuts and the setup status — nothing is hidden in the tray.
       openHome()
       if (!store.get('welcomed')) {
         store.set('welcomed', true)
         notifyTray(
           'Gemini Desktop Companion is running',
-          'The Home window explains everything — shortcuts, sign-in and both features. Find the ✨ sparkle in your tray anytime.'
+          'The Home window explains everything — shortcuts, connecting Gemini, and both features. Find the ✨ sparkle in your tray anytime.'
         )
       }
     }

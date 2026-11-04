@@ -136,15 +136,15 @@ npm run dist       # typecheck → build → electron-builder (NSIS, x64)
 
 The artifact lands at `release/<version>/Gemini-Desktop-Companion-Setup-<version>.exe`.
 
-## 🔐 Google Login & History
+## 🔑 Connecting Gemini (free API key)
 
-Sign-in runs in **your real browser** (Edge/Chrome) — Google never shows the *"This browser or app may not be secure"* wall because there's no embedded browser at all:
+Gemini runs on the **official Gemini API** (Google AI Studio) — the reliable path: no sign-in dance, no scraping, no "browser not secure" walls, and it streams properly through any network setup.
 
-1. Click **Sign in with your browser** (Home window, Settings → Google Account, or the palette's banner).
-2. A clean Edge/Chrome window opens on the Google sign-in page. Sign in exactly like you always do.
-3. The moment the session is live, the app imports it securely, the browser window closes itself, and the status turns green. From then on, **every chat — typed or screenshot-attached — is saved to your Gemini history** at [gemini.google.com/app](https://gemini.google.com/app). The 🕘 button opens it instantly.
+1. In the **Home window** (or Settings → Gemini API, or the palette's banner), click **Get API key** — your browser opens [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
+2. Sign in with your Google account and click **Create API key** (free tier included).
+3. Copy the key (starts with `AIza`), paste it into the app, hit **Connect** — validation is instant and the key is **encrypted on your PC** (Windows DPAPI via safeStorage).
 
-If Google ever expires the session, the status turns red and the banner returns — click **Sign in** again.
+That's it. Subsequent asks stream in real time, screenshots are attached natively (Gemini actually sees the pixels), and conversations keep their context in the palette. The key never leaves your machine except to call Google's API directly.
 
 ## 📁 Project Structure
 
@@ -257,7 +257,7 @@ Expected for unsigned NSIS builds. Verify with the checksums in the release note
 
 - [ ] True hold-to-talk voice input
 - [ ] Per-monitor DPI-perfect lasso (free-form) selection
-- [ ] Local answer history with full-text search
+- [x] Conversation context in the palette · local history export planned
 - [ ] Multi-model support (AI Studio / ChatGPT tabs)
 - [ ] Code-signed installer + `electron-updater` delta updates
 
