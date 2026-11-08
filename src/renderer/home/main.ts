@@ -1,4 +1,7 @@
 import type { ApiState, SettingsAllResponse } from '../../shared/types'
+import { initTheme } from '../shared/theme'
+
+initTheme()
 
 /**
  * Home interface logic: Gemini API connection, "Try it now" launches, and

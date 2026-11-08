@@ -4,6 +4,9 @@ import type {
   SetHotkeysResponse,
   SettingsAllResponse
 } from '../../shared/types'
+import { initTheme } from '../shared/theme'
+
+initTheme()
 
 /**
  * iOS-style Settings panel: live hotkey recorders, startup toggle,
@@ -53,6 +56,7 @@ async function loadAll(): Promise<void> {
   setStartupToggle(current.startup)
   applyRegistration(current.registration)
   applyApi(current.api)
+  applyThemeButtons(current.theme)
 }
 
 function applyRegistration(reg: RegistrationStatus): void {
@@ -218,6 +222,19 @@ function normalizeKey(e: KeyboardEvent): string | null {
 function formatAccelerator(acc: string): string {
   return acc.replace(/\+/g, ' + ')
 }
+
+/* ── Theme picker ───────────────────────────────────────────────────── */
+const themeButtons = Array.from(document.querySelectorAll('#theme-picker .seg-btn')) as HTMLButtonElement[]
+function applyThemeButtons(theme: string): void {
+  for (const b of themeButtons) b.classList.toggle('active', b.dataset.theme === theme)
+}
+
+themeButtons.forEach((b) =>
+  b.addEventListener('click', () => {
+    void window.gdc.settings.setTheme(b.dataset.theme ?? 'dark')
+  })
+)
+window.gdc.settings.onThemeChanged((t) => applyThemeButtons(String(t)))
 
 /* ── Startup toggle ────────────────────────────────────────────────────── */
 function setStartupToggle(on: boolean): void {

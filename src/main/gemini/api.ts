@@ -17,9 +17,9 @@ import { log } from '../logger'
  */
 
 const API_HOST = 'generativelanguage.googleapis.com'
-export const MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'] as const
+export const MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'] as const
 export type ModelId = (typeof MODELS)[number]
-const DEFAULT_MODEL: ModelId = 'gemini-3.8-flash'
+const DEFAULT_MODEL: ModelId = 'gemini-3.6-flash'
 const FIRST_BYTE_TIMEOUT_MS = 60_000
 const IDLE_TIMEOUT_MS = 20_000
 const OVERALL_TIMEOUT_MS = 120_000

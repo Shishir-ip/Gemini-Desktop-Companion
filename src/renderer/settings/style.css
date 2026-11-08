@@ -243,3 +243,33 @@ button:disabled {
   gap: 8px;
   flex-shrink: 0;
 }
+
+/* Theme picker (segmented control) */
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--app-input-bg);
+  border: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+.seg-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 550;
+  border-radius: 8px;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: background 200ms var(--ease-ios), color 200ms var(--ease-ios);
+}
+.seg-btn:hover {
+  color: var(--text-primary);
+}
+.seg-btn.active {
+  background: linear-gradient(135deg, rgba(79, 140, 255, 0.35), rgba(168, 85, 247, 0.35));
+  color: #fff;
+}

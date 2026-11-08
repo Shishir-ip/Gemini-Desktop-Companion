@@ -5,6 +5,9 @@ import type {
   GeminiErrorPayload,
   GeminiStatusPayload
 } from '../../shared/types'
+import { initTheme } from '../shared/theme'
+
+initTheme()
 
 /**
  * Floating Gemini command palette — chat-bubble UI (user prompts right,
@@ -466,3 +469,13 @@ messages.addEventListener('click', (e) => {
     void window.gdc.openExternal((anchor as HTMLElement).dataset.href ?? '')
   }
 })
+
+/* ── Pop-in animation on every show ────────────────────────────────────── */
+window.gdc.gemini.onShown(() => {
+  const wrap = document.getElementById('wrap')
+  if (!wrap) return
+  wrap.classList.remove('shown')
+  void (wrap as HTMLElement).offsetWidth // force reflow to replay animation
+  wrap.classList.add('shown')
+})
+document.body.classList.add('shown')

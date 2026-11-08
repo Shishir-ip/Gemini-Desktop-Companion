@@ -10,6 +10,7 @@ type Listener<T> = (payload: T) => void
  */
 const IPC = {
   CircleGetCapture: 'circle:get-capture',
+  CircleSetImage: 'circle:set-image',
   CircleReady: 'circle:ready',
   CircleSelected: 'circle:selected',
   CircleCancel: 'circle:cancel',
@@ -29,6 +30,7 @@ const IPC = {
   GeminiStop: 'gemini:stop',
   WidgetShown: 'widget:shown',
   WidgetResize: 'widget:resize',
+  ThemeChanged: 'theme:changed',
   GeminiApiChanged: 'gemini:api-changed',
   GeminiStatus: 'gemini:status',
   GeminiChunk: 'gemini:chunk',
@@ -44,6 +46,7 @@ const IPC = {
   SettingsClearApiKey: 'settings:clear-api-key',
   SettingsOpenApiKeys: 'settings:open-apikeys',
   SettingsCheckUpdates: 'settings:check-updates',
+  SettingsSetTheme: 'settings:set-theme',
   ApiChanged: 'api:changed',
   AppOpenExternal: 'app:open-external',
   AppStartCircle: 'app:start-circle',
@@ -67,6 +70,7 @@ const api = {
   /** Circle to Search selection overlay. */
   circle: {
     getCapture: () => ipcRenderer.invoke(IPC.CircleGetCapture),
+    onSetImage: (cb: Listener<unknown>) => subscribe(IPC.CircleSetImage, cb),
     /** Tell the main process this overlay painted and is interactive. */
     ready: () => ipcRenderer.send(IPC.CircleReady),
     selectFinished: (dataUrl: string) => ipcRenderer.invoke(IPC.CircleSelected, dataUrl),
@@ -112,6 +116,8 @@ const api = {
     setHotkeys: (hotkeys: { circleToSearch: string; holdToGemini: string }) =>
       ipcRenderer.invoke(IPC.SettingsSetHotkeys, hotkeys),
     setStartup: (enabled: boolean) => ipcRenderer.invoke(IPC.SettingsSetStartup, enabled),
+    setTheme: (theme: string) => ipcRenderer.invoke(IPC.SettingsSetTheme, theme),
+    onThemeChanged: (cb: Listener<string>) => subscribe(IPC.ThemeChanged, cb),
     checkApi: () => ipcRenderer.invoke(IPC.SettingsCheckApi),
     setApiKey: (key: string) => ipcRenderer.invoke(IPC.SettingsSetApiKey, key),
     clearApiKey: () => ipcRenderer.invoke(IPC.SettingsClearApiKey),

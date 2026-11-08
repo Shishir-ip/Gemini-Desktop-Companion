@@ -132,3 +132,14 @@ body.lens-mode #sel {
   color: rgba(255, 255, 255, 0.9);
   white-space: nowrap;
 }
+
+/* Smooth fade-in of the frozen screen */
+#shot,
+#dim {
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+body.ready #shot,
+body.ready #dim {
+  opacity: 1;
+}

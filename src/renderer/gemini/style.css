@@ -459,3 +459,27 @@ body.closing #input-card {
   border-radius: 4px;
   padding: 1px 5px;
 }
+
+/* Palette pop-from-bottom animation (replayed on every show) */
+#wrap .glass-card {
+  opacity: 0;
+}
+body.shown #wrap .glass-card {
+  animation: palette-pop 280ms var(--ease-ios) both;
+}
+body.shown #wrap #input-card {
+  animation-delay: 0ms;
+}
+body.shown #wrap #response-card {
+  animation-delay: 50ms;
+}
+@keyframes palette-pop {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

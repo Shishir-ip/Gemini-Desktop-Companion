@@ -49,10 +49,28 @@ async function init(): Promise<void> {
     attachHint.hidden = false
   }
 
+  // Smooth fade-in of the frozen screen.
+  document.body.classList.add('ready')
+
   // Paint one frame, then tell the main process we're alive and interactive
   // (clears its dead-renderer watchdog).
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
   window.gdc.circle.ready()
+
+  // Warm reuse: a fresh frozen frame pushed into this already-loaded page.
+  window.gdc.circle.onSetImage((payload) => {
+    const capture = payload as { dataUrl: string; scaleFactor: number; mode: CircleMode }
+    mode = capture.mode
+    scaleFactor = capture.scaleFactor
+    lensMode = false
+    document.body.classList.remove('lens-mode')
+    resetSelection()
+    img.onload = () => {
+      document.body.classList.add('ready')
+      window.gdc.circle.ready()
+    }
+    img.src = capture.dataUrl
+  })
 
   window.gdc.circle.onSetLensMode(() => {
     lensMode = true

@@ -2,6 +2,7 @@
 export const IPC = {
   // ── Circle to Search overlay ────────────────────────────────────────────
   CircleGetCapture: 'circle:get-capture',
+  CircleSetImage: 'circle:set-image',
   CircleReady: 'circle:ready',
   CircleSelected: 'circle:selected',
   CircleCancel: 'circle:cancel',
@@ -25,6 +26,7 @@ export const IPC = {
   GeminiStop: 'gemini:stop',
   WidgetShown: 'widget:shown',
   WidgetResize: 'widget:resize',
+  ThemeChanged: 'theme:changed',
   GeminiApiChanged: 'gemini:api-changed', // main → widget renderer
   GeminiStatus: 'gemini:status', // main → renderer
   GeminiChunk: 'gemini:chunk', // main → renderer
@@ -42,6 +44,7 @@ export const IPC = {
   SettingsClearApiKey: 'settings:clear-api-key',
   SettingsOpenApiKeys: 'settings:open-apikeys',
   SettingsCheckUpdates: 'settings:check-updates',
+  SettingsSetTheme: 'settings:set-theme',
   ApiChanged: 'api:changed', // main → UIs
 
   // ── Generic ─────────────────────────────────────────────────────────────

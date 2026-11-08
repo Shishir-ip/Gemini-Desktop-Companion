@@ -63,6 +63,21 @@ export async function startCircleToSearch(m: CircleMode = 'lens'): Promise<void>
   for (const [displayId, capture] of captures) {
     const display = screen.getAllDisplays().find((d) => d.id === displayId)
     if (!display) continue
+    const existing = overlays.get(displayId)
+    if (existing && !existing.isDestroyed()) {
+      // Warm reuse: overlay page is already loaded — push the new frozen
+      // frame and reshow. This is the fast path (no page load).
+      readyWindows.add(existing)
+      existing.webContents.send(IPC.CircleSetImage, {
+        dataUrl: capture.dataUrl,
+        scaleFactor: capture.scaleFactor,
+        mode
+      })
+      existing.show()
+      existing.focus()
+      log('[circle] overlay reused (fast path)')
+      continue
+    }
     createOverlay(display, displayId, capture)
   }
   log(`[circle] overlays created (mode: ${m}, displays: ${captures.size})`)
@@ -183,9 +198,8 @@ export function isLensModeActive(): boolean {
 
 export function closeAllOverlays(): void {
   for (const win of overlays.values()) {
-    if (!win.isDestroyed()) win.destroy()
+    if (!win.isDestroyed()) win.hide()
   }
-  overlays.clear()
   lensModeActive = false
 }
 

@@ -129,7 +129,7 @@ export function resizeWidgetTo(height: number): void {
   widget.setBounds({ x: b.x, y: nextY, width: WIDGET_WIDTH, height: clamped })
 }
 
-function destroyWidget(): void {
+export function destroyWidget(): void {
   if (widget && !widget.isDestroyed()) widget.destroy()
   widget = null
 }

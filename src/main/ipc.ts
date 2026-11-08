@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain, shell } from 'electron'
+import { BrowserWindow, app, ipcMain, nativeTheme, shell } from 'electron'
 import { IPC } from '../shared/ipc'
 import type { Hotkeys, SetHotkeysResponse } from '../shared/types'
 import { store, getSettings } from './store'
@@ -24,6 +24,7 @@ import {
   getPanelWindow
 } from './windows/resultsPanel'
 import {
+  destroyWidget,
   hideGeminiWidget,
   showGeminiWidget,
   bindWidgetResizeIpc,
@@ -101,9 +102,12 @@ export function registerIpc(): void {
   })
   ipcMain.handle(IPC.GeminiRemoveAttachment, () => clearPendingAttachment())
   ipcMain.handle(IPC.GeminiNewChat, () => gemini.resetChat())
-  // X = close the chat: hide the window AND discard the conversation.
+  // X = close the chat: DESTROY the window and discard the conversation.
+  // Reopening builds a brand-new palette (first-launch state) — no stale
+  // window state can persist.
   ipcMain.handle(IPC.GeminiClose, () => {
     hideGeminiWidget()
+    destroyWidget()
     gemini.resetChat()
   })
   // PIP = minimize into the orb; conversation continues.
@@ -118,6 +122,7 @@ export function registerIpc(): void {
     registration: registrationStatus,
     startup: isLaunchAtStartup(),
     api: gemini.getState(),
+    theme: store.get('theme'),
     isDev: !app.isPackaged
   }))
   ipcMain.handle(
@@ -159,6 +164,15 @@ export function registerIpc(): void {
   })
   ipcMain.handle(IPC.SettingsOpen, () => openSettings())
   ipcMain.handle(IPC.SettingsCheckUpdates, () => checkForUpdates(true))
+  ipcMain.handle(IPC.SettingsSetTheme, (_event, theme: string) => {
+    const t = ['auto', 'dark', 'light'].includes(theme) ? theme : 'dark'
+    store.set('theme', t)
+    nativeTheme.themeSource = t === 'auto' ? 'system' : (t as 'dark' | 'light')
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send(IPC.ThemeChanged, t)
+    }
+    return t
+  })
 
   // ── Generic window helpers ───────────────────────────────────────────
   ipcMain.handle(IPC.AppOpenExternal, (_event, url: string) => openExternalUrl(url))

@@ -47,6 +47,7 @@ export interface SettingsAllResponse {
   registration: RegistrationStatus
   startup: boolean
   api: ApiState
+  theme: 'auto' | 'dark' | 'light'
   isDev: boolean
 }
 
