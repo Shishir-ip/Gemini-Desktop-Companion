@@ -22,6 +22,7 @@ export const IPC = {
   GeminiNewChat: 'gemini:new-chat',
   GeminiClose: 'gemini:close',
   GeminiPip: 'gemini:pip',
+  GeminiStop: 'gemini:stop',
   WidgetShown: 'widget:shown',
   WidgetSetIgnoreMouse: 'widget:set-ignore-mouse',
   GeminiApiChanged: 'gemini:api-changed', // main → widget renderer

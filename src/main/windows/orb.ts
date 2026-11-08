@@ -72,7 +72,7 @@ export function showOrb(near?: Rectangle): void {
   const display = near
     ? screen.getDisplayNearestPoint({ x: near.x + near.width - 40, y: near.y + near.height - 40 })
     : cursorDisplay()
-  const size = 76
+  const size = 62
   const wa = display.workArea
   const base = near ?? {
     x: wa.x + wa.width - 120,

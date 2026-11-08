@@ -50,6 +50,19 @@ let lastError: GeminiErrorPayload | null = null
 // Active model bubble being streamed into (null until the first chunk).
 let activeBubble: { body: HTMLDivElement; setText: (html: string) => void } | null = null
 let lastCopyOk = false
+let isBusy = false
+const sendArrow = sendBtn.innerHTML
+const stopIcon =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>'
+
+function setBusy(busy: boolean): void {
+  isBusy = busy
+  sendBtn.title = busy ? 'Stop generating' : 'Send (Enter)'
+  sendBtn.innerHTML = busy ? stopIcon : sendArrow
+  sendBtn.disabled = busy
+    ? false
+    : prompt.value.trim().length === 0 && !attachment
+}
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
 refreshState().catch(console.error)
@@ -61,11 +74,19 @@ window.addEventListener('focus', () => {
   // restarts in click-through mode and our flag must match, or the palette
   // reopens visible but untouchable.
   ignoringMouse = true
+  setBusy(false)
   refreshState().catch(console.error)
 })
 window.gdc.gemini.onShown(() => {
   ignoringMouse = true
   prompt.focus()
+  // CRITICAL: if the palette was closed mid-answer, the request was
+  // cancelled without a done/error event — isBusy stayed true and every
+  // later submit was swallowed as a "stop" (the "stops responding" bug).
+  // Reopening resets the busy state so questions work again.
+  setBusy(false)
+  hideThinking()
+  streamCursor.hidden = true
   refreshState().catch(console.error)
 })
 
@@ -169,8 +190,10 @@ window.gdc.gemini.onStatus((payload) => {
   const p = payload as GeminiStatusPayload
   if ((p as { target?: string }).target !== 'widget') return
   if (p.stage === 'working') {
+    setBusy(true)
     showThinking(p.detail ?? 'Thinking…')
   } else if (p.stage === 'streaming') {
+    setBusy(true)
     hideThinking()
   }
 })
@@ -187,6 +210,7 @@ window.gdc.gemini.onChunk((payload) => {
 })
 window.gdc.gemini.onDone((payload) => {
   if ((payload as { target?: string }).target !== 'widget') return
+  setBusy(false)
   streamCursor.hidden = true
   hideThinking()
   responseFooter.hidden = false
@@ -195,6 +219,7 @@ window.gdc.gemini.onError((payload) => {
   const p = payload as GeminiErrorPayload
   if ((p as { target?: string }).target !== 'widget') return
   lastError = p
+  setBusy(false)
   hideThinking()
   streamCursor.hidden = true
   errorBox.hidden = false
@@ -205,7 +230,18 @@ window.gdc.gemini.onError((payload) => {
 })
 
 /* ── Actions ───────────────────────────────────────────────────────────── */
-sendBtn.addEventListener('click', () => submit())
+sendBtn.addEventListener('click', () => {
+  if (isBusy) {
+    // Stop generating: cancel the request, keep the partial answer.
+    void window.gdc.gemini.stop()
+    setBusy(false)
+    hideThinking()
+    streamCursor.hidden = true
+    responseFooter.hidden = false
+    return
+  }
+  submit()
+})
 prompt.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
@@ -323,6 +359,14 @@ window.addEventListener('keydown', (e) => {
 })
 
 async function submit(forceText?: string, isRetry = false): Promise<void> {
+  if (isBusy) {
+    void window.gdc.gemini.stop()
+    setBusy(false)
+    hideThinking()
+    streamCursor.hidden = true
+    responseFooter.hidden = false
+    return
+  }
   if (!api.hasKey) {
     showError('NO_API_KEY', 'Connect Gemini first — paste a free API key from aistudio.google.com/apikey.')
     return
@@ -335,6 +379,7 @@ async function submit(forceText?: string, isRetry = false): Promise<void> {
   prompt.value = ''
   autoSize()
   hideError()
+  setBusy(true)
   showThinking(attachment ? 'Reading your screenshot…' : 'Thinking…')
   activeBubble = null
   activeBubbleRaw = ''

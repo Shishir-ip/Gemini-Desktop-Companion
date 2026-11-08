@@ -12,33 +12,39 @@ body {
 #orb {
   position: fixed;
   inset: 0;
-  width: 76px;
-  height: 76px;
+  width: 60px;
+  height: 60px;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(30, 30, 36, 0.92), rgba(18, 18, 22, 0.92));
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55), 0 0 26px rgba(126, 166, 255, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: radial-gradient(circle at 32% 28%, rgba(52, 54, 66, 0.96), rgba(16, 16, 20, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  /* Proper circular glow: layered soft shadows hugging the round shape. */
+  box-shadow:
+    0 0 0 1px rgba(126, 166, 255, 0.10),
+    0 0 18px rgba(126, 166, 255, 0.22),
+    0 0 42px rgba(168, 85, 247, 0.16),
+    0 8px 28px rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: box-shadow 200ms var(--ease-ios, ease), transform 200ms var(--ease-ios, ease);
+  transition: box-shadow 220ms var(--ease-ios, ease), transform 220ms var(--ease-ios, ease);
   user-select: none;
   -webkit-user-select: none;
 }
 #orb:hover {
-  transform: scale(1.07);
-  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.6), 0 0 34px rgba(126, 166, 255, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transform: scale(1.06);
+  box-shadow:
+    0 0 0 1px rgba(126, 166, 255, 0.22),
+    0 0 24px rgba(126, 166, 255, 0.38),
+    0 0 60px rgba(168, 85, 247, 0.26),
+    0 10px 34px rgba(0, 0, 0, 0.55);
 }
 #orb:active {
-  transform: scale(0.96);
+  transform: scale(0.95);
 }
 #orb img {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  box-shadow: 0 4px 16px rgba(126, 166, 255, 0.45);
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
   pointer-events: none;
 }

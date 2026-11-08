@@ -106,6 +106,8 @@ export function registerIpc(): void {
   })
   // PIP = minimize into the orb; conversation continues.
   ipcMain.handle(IPC.GeminiPip, () => hideGeminiWidget({ orb: true }))
+  // Stop = cancel the in-flight answer (partial text stays).
+  ipcMain.handle(IPC.GeminiStop, () => gemini.cancelActive())
   ipcMain.handle(IPC.WidgetSetIgnoreMouse, (_event, ignore: boolean) => {
     setWidgetIgnoreMouse(Boolean(ignore))
   })

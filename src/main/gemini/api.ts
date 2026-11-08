@@ -160,6 +160,9 @@ export class GeminiApiClient extends EventEmitter {
   }
 
   resetChat(): void {
+    // Closing mid-answer must also kill the in-flight request AND any
+    // scheduled retries — otherwise zombie timers cancel newer questions.
+    this.cancelActive()
     this.history = []
     this.historyEpoch++
     log('[api] conversation reset')
@@ -230,7 +233,7 @@ export class GeminiApiClient extends EventEmitter {
       this.gen++
       try { this.abortFn?.() } catch { /* ignore */ }
       this.active = false
-      log('[api] in-flight request cancelled (superseded)')
+      log('[api] in-flight request cancelled (stop/superseded)')
     }
   }
 
@@ -283,6 +286,7 @@ export class GeminiApiClient extends EventEmitter {
     let sseBuffer = ''
     let finished = false
     let gotFirstByte = false
+    let liveAnnounced = false
     let firstByteAt = 0
     let lastDataAt = Date.now()
     let usage = ''
@@ -290,7 +294,11 @@ export class GeminiApiClient extends EventEmitter {
 
     const cleanup = (res?: import('node:http').IncomingMessage): void => {
       finished = true
-      if (stale()) this.active = false
+      // CRITICAL: a superseded (stale) stream must NEVER touch this.active —
+      // the flag now belongs to the newer stream. Stomping it here is what
+      // corrupted the lifecycle when a user closed mid-answer and asked
+      // something new (the client then silently ignored fresh questions).
+      if (!stale()) this.active = false
       try { res?.destroy() } catch { /* ignore */ }
     }
 
@@ -338,6 +346,12 @@ export class GeminiApiClient extends EventEmitter {
         return
       }
       const now = Date.now()
+      // Liveness: the free tier can take 15-40s to first token; keep the
+      // user informed instead of a silent spinner.
+      if (!gotFirstByte && !liveAnnounced && now - startedAt > 15_000) {
+        liveAnnounced = true
+        emitT('status', { stage: 'working', detail: 'Still connecting to Google — free tier can be slow…' })
+      }
       if (!gotFirstByte && now - startedAt > FIRST_BYTE_TIMEOUT_MS) {
         clearInterval(watchdog)
         try { reqHandle?.destroy(new Error('first-byte timeout')) } catch { /* ignore */ }
@@ -411,7 +425,16 @@ export class GeminiApiClient extends EventEmitter {
                   detail: `Rate limited by the free tier — retrying in ${delayS}s…`
                 })
                 log(`[api] ${opts.startedLabel} 429 — retrying in ${delayS}s (${rateLeft - 1} retries left)`)
+                // Zombie-timer guard: if the user closed/superseded the chat
+                // while we were waiting, the scheduled retry must NOT fire —
+                // it used to cancel-and-replace the user's newer stream.
+                const scheduledGen = myGen
                 setTimeout(() => {
+                  if (myGen !== this.gen || stale()) {
+                    log('[api] 429 retry skipped (superseded)')
+                    return
+                  }
+                  void scheduledGen
                   void this.streamOnce(contents, {
                     ...opts,
                     rateRetries: rateLeft - 1
