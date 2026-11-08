@@ -17,11 +17,11 @@ import {
   markOverlayReady
 } from './windows/overlay'
 import {
+  bindPanelIpc,
+  retryLensInPanel,
   getLastCrop,
   closePanel,
-  forwardResultsEvent,
-  getPanelWindow,
-  reopenLensPopup
+  getPanelWindow
 } from './windows/resultsPanel'
 import {
   hideGeminiWidget,
@@ -42,7 +42,6 @@ export function registerIpc(): void {
 
   const forwardEvent = (channel: string, payload: unknown): void => {
     forwardGeminiEvent(channel, payload)
-    forwardResultsEvent(channel, payload)
   }
 
   gemini.on('status', (payload) => forwardEvent(IPC.GeminiStatus, payload))
@@ -53,18 +52,10 @@ export function registerIpc(): void {
   // ── Circle to Search ─────────────────────────────────────────────────
   registerOverlayIpc()
 
-  // ── Results panel (Gemini vision + Lens fallback) ────────────────────
+  // ── Results panel: session-driven Google Lens (reporter's approach) ──
   ipcMain.handle(IPC.ResultsGetCrop, () => getLastCrop())
-  ipcMain.handle(IPC.LensOpenWeb, async () => reopenLensPopup())
-  ipcMain.handle(IPC.ResultsAnalyze, async () => {
-    const crop = getLastCrop()
-    if (!crop) return
-    const imageB64 = crop.replace(/^data:image\/\w+;base64,/, '')
-    await gemini.submitVision(
-      'You are Circle to Search. Analyze this screenshot region: transcribe any text exactly, identify objects, products, people, landmarks, apps, errors or code you see, then give a concise, useful summary in 2-5 short bullets. If it shows a question or an error message, answer or fix it. Stay under 180 words.',
-      imageB64
-    )
-  })
+  ipcMain.handle(IPC.LensOpenWeb, async () => retryLensInPanel())
+  bindPanelIpc()
   ipcMain.handle(IPC.WindowClose, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     // The results panel is a transient surface: close destroys it.

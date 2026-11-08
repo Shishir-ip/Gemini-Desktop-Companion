@@ -26,9 +26,15 @@ const OVERALL_TIMEOUT_MS = 120_000
 // Small context = faster serialization + shorter model preamble.
 const MAX_HISTORY_ENTRIES = 8
 
-// Reuse TLS connections across requests — a fresh handshake per call adds
-// hundreds of ms on high-latency networks.
-const keepAliveAgent = new https.Agent({ keepAlive: true, maxSockets: 8 })
+// Reuse TLS connections, but never let a pooled socket go stale: idle
+// sockets are probed (keepAliveMsecs) and destroyed after 60s of inactivity
+// — dead sockets through NAT/proxies used to hang requests invisibly.
+const keepAliveAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 8,
+  keepAliveMsecs: 15_000,
+  timeout: 60_000
+})
 
 export interface ApiState {
   hasKey: boolean
@@ -51,6 +57,7 @@ export class GeminiApiClient extends EventEmitter {
   private keyValid = false
   private model: ModelId = DEFAULT_MODEL
   private history: ChatContent[] = []
+  private historyEpoch = 0
   private active = false
   private gen = 0
   private abortFn: (() => void) | null = null
@@ -154,6 +161,7 @@ export class GeminiApiClient extends EventEmitter {
 
   resetChat(): void {
     this.history = []
+    this.historyEpoch++
     log('[api] conversation reset')
   }
 
@@ -237,6 +245,8 @@ export class GeminiApiClient extends EventEmitter {
       useTools?: boolean
       thinkingOff?: boolean
       rateRetries?: number
+      freshSocketRetry?: boolean
+      agentless?: boolean
     }
   ): Promise<void> {
     this.cancelActive()
@@ -267,6 +277,7 @@ export class GeminiApiClient extends EventEmitter {
       ...(opts.useTools ? { tools: [{ google_search: {} }] } : {})
     })
     const sources: { title: string; uri: string }[] = []
+    const historyEpoch = this.historyEpoch
 
     let full = ''
     let sseBuffer = ''
@@ -286,7 +297,9 @@ export class GeminiApiClient extends EventEmitter {
     const finishOk = (res?: import('node:http').IncomingMessage): void => {
       if (finished || stale()) return
       if (full.length > 0) {
-        if (opts.persist) {
+        if (opts.persist && historyEpoch === this.historyEpoch) {
+          // Only persist into history if the conversation wasn't reset
+          // while this response was streaming.
           this.history.push({ role: 'user', parts: contents[contents.length - 1].parts })
           this.history.push({ role: 'model', parts: [{ text: full }] })
           while (this.history.length > MAX_HISTORY_ENTRIES) this.history.shift()
@@ -328,6 +341,18 @@ export class GeminiApiClient extends EventEmitter {
       if (!gotFirstByte && now - startedAt > FIRST_BYTE_TIMEOUT_MS) {
         clearInterval(watchdog)
         try { reqHandle?.destroy(new Error('first-byte timeout')) } catch { /* ignore */ }
+        // A dead pooled keep-alive socket can hang the first byte. Retry
+        // ONCE on a brand-new (non-pooled) connection before surfacing.
+        if (!opts.freshSocketRetry) {
+          log(`[api] ${opts.startedLabel} first-byte timeout — retrying once on a fresh connection`)
+          emitT('status', { stage: 'working', detail: 'Reconnecting to Google…' })
+          void this.streamOnce(contents, {
+            ...opts,
+            freshSocketRetry: true,
+            agentless: true
+          }).catch(() => {})
+          return
+        }
         fail(
           'NETWORK',
           "Google's API did not start responding in time — your network or proxy may be blocking generativelanguage.googleapis.com. Try again."
@@ -493,7 +518,8 @@ export class GeminiApiClient extends EventEmitter {
           this.abortFn = () => {
             try { reqHandle?.destroy(new Error('cancelled')) } catch { /* ignore */ }
           }
-        }
+        },
+        opts.agentless ? (false as unknown as https.Agent) : undefined
       ).catch((err) => {
         clearInterval(watchdog)
         fail('NETWORK', `Could not reach Google's API: ${String((err as Error)?.message ?? err)}`)
@@ -511,7 +537,8 @@ export class GeminiApiClient extends EventEmitter {
     body: string | null,
     onResponse?: (res: import('node:http').IncomingMessage) => void,
     onError?: (err: Error) => void,
-    onRequest?: (req: import('node:http').ClientRequest) => void
+    onRequest?: (req: import('node:http').ClientRequest) => void,
+    agentOverride?: https.Agent | false
   ): Promise<number> {
     return new Promise((resolve, reject) => {
       const headers: Record<string, string | number> = {
@@ -528,7 +555,7 @@ export class GeminiApiClient extends EventEmitter {
           method,
           headers,
           timeout: method === 'GET' ? 15000 : 0,
-          agent: keepAliveAgent
+          agent: agentOverride !== undefined ? agentOverride : keepAliveAgent
         },
         (res) => {
           resolve(res.statusCode ?? 0)

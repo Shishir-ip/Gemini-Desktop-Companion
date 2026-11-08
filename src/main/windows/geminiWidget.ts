@@ -17,12 +17,20 @@ function cursorDisplay(): Display {
   }
 }
 
-/** Show (or focus) the iOS-style floating Gemini command palette. */
+/**
+ * Show (or focus) the iOS-style floating Gemini command palette.
+ * Resynchronizes the mouse-ignore state: hiding sets the window
+ * click-through, and the renderer's local flag goes stale across
+ * hide/show — without this resync the palette reopens visible but
+ * untouchable (the "stops responding after close+reopen" bug).
+ */
 export function showGeminiWidget(): void {
   if (widget && !widget.isDestroyed()) {
     widget.show()
     widget.focus()
-    // The renderer re-pulls state (attachment, login) when it regains focus.
+    widget.webContents.focus()
+    widget.setIgnoreMouseEvents(true, { forward: true })
+    widget.webContents.send(IPC.WidgetShown)
     return
   }
 

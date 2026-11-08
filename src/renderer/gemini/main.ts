@@ -57,6 +57,15 @@ prompt.focus()
 
 window.addEventListener('focus', () => {
   prompt.focus()
+  // Resync click-through bookkeeping after hide/show cycles: the window
+  // restarts in click-through mode and our flag must match, or the palette
+  // reopens visible but untouchable.
+  ignoringMouse = true
+  refreshState().catch(console.error)
+})
+window.gdc.gemini.onShown(() => {
+  ignoringMouse = true
+  prompt.focus()
   refreshState().catch(console.error)
 })
 

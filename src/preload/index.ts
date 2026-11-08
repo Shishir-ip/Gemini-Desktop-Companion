@@ -26,6 +26,7 @@ const IPC = {
   GeminiNewChat: 'gemini:new-chat',
   GeminiClose: 'gemini:close',
   GeminiPip: 'gemini:pip',
+  WidgetShown: 'widget:shown',
   WidgetSetIgnoreMouse: 'widget:set-ignore-mouse',
   GeminiApiChanged: 'gemini:api-changed',
   GeminiStatus: 'gemini:status',
@@ -88,7 +89,8 @@ const api = {
     onDone: (cb: Listener<unknown>) => subscribe(IPC.GeminiDone, cb),
     onError: (cb: Listener<unknown>) => subscribe(IPC.GeminiError, cb),
     onAttachment: (cb: Listener<unknown>) => subscribe(IPC.GeminiAttachmentChanged, cb),
-    onApiChanged: (cb: Listener<unknown>) => subscribe(IPC.GeminiApiChanged, cb)
+    onApiChanged: (cb: Listener<unknown>) => subscribe(IPC.GeminiApiChanged, cb),
+    onShown: (cb: Listener<void>) => subscribe(IPC.WidgetShown, cb)
   },
 
   /**
