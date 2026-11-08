@@ -93,11 +93,37 @@ async function refreshState(): Promise<void> {
     const state = (await window.gdc.gemini.getState()) as {
       attachment: Attachment | null
       api: ApiState
+      chatLog: Array<{ role: 'user' | 'model'; text: string }>
     }
     setAttachment(state.attachment)
     setApiState(state.api)
+    renderChatLog(state.chatLog)
   } catch (err) {
     console.error('getState failed', err)
+  }
+}
+
+/** Re-render the full chat from the main-process chat log. */
+function renderChatLog(log: Array<{ role: 'user' | 'model'; text: string }>): void {
+  messages.innerHTML = ''
+  activeBubble = null
+  activeBubbleRaw = ''
+  for (const entry of log) {
+    if (entry.role === 'user') {
+      appendUserBubble(entry.text)
+    } else {
+      appendModelBubble()
+      activeBubbleRaw = entry.text
+      ;(activeBubble as { setText: (html: string) => void } | null)?.setText(renderMarkdown(activeBubbleRaw))
+      activeBubble = null // finalized — no streaming cursor
+    }
+  }
+  if (log.length > 0) {
+    responseCard.hidden = false
+    responseFooter.hidden = false
+    scrollMessages()
+  } else {
+    responseCard.hidden = true
   }
 }
 

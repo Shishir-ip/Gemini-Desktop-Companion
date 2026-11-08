@@ -58,6 +58,8 @@ export class GeminiApiClient extends EventEmitter {
   private model: ModelId = DEFAULT_MODEL
   private history: ChatContent[] = []
   private historyEpoch = 0
+  /** Display chat log — the single source of truth for the palette UI. */
+  private chatLog: Array<{ role: 'user' | 'model'; text: string }> = []
   private active = false
   private gen = 0
   private abortFn: (() => void) | null = null
@@ -164,8 +166,14 @@ export class GeminiApiClient extends EventEmitter {
     // scheduled retries — otherwise zombie timers cancel newer questions.
     this.cancelActive()
     this.history = []
+    this.chatLog = []
     this.historyEpoch++
     log('[api] conversation reset')
+  }
+
+  /** Full display chat log — the palette re-renders from this on every open. */
+  getChatLog(): Array<{ role: 'user' | 'model'; text: string }> {
+    return this.chatLog
   }
 
   /** Warm-up: validate the stored key (no-op when absent). */
@@ -193,6 +201,7 @@ export class GeminiApiClient extends EventEmitter {
     const parts: ChatPart[] = [{ text: prompt }]
     if (imageB64) parts.push({ inline_data: { mime_type: 'image/png', data: imageB64 } })
     const contents: ChatContent[] = [...this.history, { role: 'user', parts }]
+    this.chatLog.push({ role: 'user', text: prompt })
     await this.streamOnce(contents, { persist: true, startedLabel: 'chat', target: 'widget', rateRetries: 3 })
   }
 
@@ -311,6 +320,11 @@ export class GeminiApiClient extends EventEmitter {
           this.history.push({ role: 'user', parts: contents[contents.length - 1].parts })
           this.history.push({ role: 'model', parts: [{ text: full }] })
           while (this.history.length > MAX_HISTORY_ENTRIES) this.history.shift()
+        }
+        // Update the display chat log (source of truth for the palette UI).
+        if (opts.persist) {
+          // The user turn was already pushed in submit().
+          this.chatLog.push({ role: 'model', text: full })
         }
         cleanup(res)
         const ttft = firstByteAt ? firstByteAt - startedAt : 0

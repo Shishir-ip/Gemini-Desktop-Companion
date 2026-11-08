@@ -73,7 +73,8 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.GeminiGetState, () => ({
     attachment: getPendingAttachment(),
     api: gemini.getState(),
-    mode: getCircleMode()
+    mode: getCircleMode(),
+    chatLog: gemini.getChatLog()
   }))
   ipcMain.handle(IPC.GeminiSubmit, async (_event, text: string) => {
     const prompt = typeof text === 'string' ? text.trim() : ''
