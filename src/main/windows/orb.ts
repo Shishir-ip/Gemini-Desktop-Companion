@@ -12,7 +12,6 @@ import { store } from '../store'
  */
 
 let orb: BrowserWindow | null = null
-let bound = false
 
 const ORB_SIZE = 52
 
@@ -61,7 +60,6 @@ function displayForBounds(b: Rectangle): Display {
 
 /** Show the orb at its fixed edge position with a scale-in animation. */
 export function showOrb(_near?: Rectangle): void {
-  bindIpc()
   if (orb && !orb.isDestroyed()) {
     orb.show()
     return
@@ -111,12 +109,4 @@ export function hideOrb(): void {
 export function destroyOrb(): void {
   if (orb && !orb.isDestroyed()) orb.destroy()
   orb = null
-}
-
-function bindIpc(): void {
-  if (bound) return
-  bound = true
-  ipcMain.handle('orb:open', () => {
-    void import('./geminiWidget').then(({ openPaletteFromOrb }) => openPaletteFromOrb())
-  })
 }

@@ -23,6 +23,7 @@ import {
   closePanel,
   getPanelWindow
 } from './windows/resultsPanel'
+import { hideOrb } from './windows/orb'
 import {
   destroyWidget,
   hideGeminiWidget,
@@ -109,6 +110,11 @@ export function registerIpc(): void {
   })
   // PIP = minimize into the orb; conversation continues.
   ipcMain.handle(IPC.GeminiPip, () => hideGeminiWidget({ orb: true }))
+  // Orb click → hide the orb and reopen the palette (context preserved).
+  ipcMain.handle(IPC.OrbOpen, () => {
+    hideOrb()
+    showGeminiWidget()
+  })
   // Stop = cancel the in-flight answer (partial text stays).
   ipcMain.handle(IPC.GeminiStop, () => gemini.cancelActive())
 
