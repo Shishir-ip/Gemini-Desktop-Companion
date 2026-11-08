@@ -44,6 +44,7 @@ window.addEventListener(
     if (!pressed || !e.isPrimary) return
     pressed = false
     const quick = moved < 8 && Date.now() - pressTime < 600
+    window.gdc.orb.dragEnd()
     if (quick) {
       void window.gdc.orb.open()
     }

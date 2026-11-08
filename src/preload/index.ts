@@ -53,6 +53,7 @@ const IPC = {
   OrbOpen: 'orb:open',
   OrbDragStart: 'orb:drag-start',
   OrbDragMove: 'orb:drag-move',
+  OrbDragEnd: 'orb:drag-end',
   AppShowWidget: 'app:show-widget',
   WindowClose: 'window:close',
   WindowMinimize: 'window:minimize'
@@ -140,7 +141,8 @@ const api = {
   orb: {
     open: () => ipcRenderer.invoke(IPC.OrbOpen),
     dragStart: () => ipcRenderer.send(IPC.OrbDragStart),
-    dragMove: (dx: number, dy: number) => ipcRenderer.send(IPC.OrbDragMove, dx, dy)
+    dragMove: (dx: number, dy: number) => ipcRenderer.send(IPC.OrbDragMove, dx, dy),
+    dragEnd: () => ipcRenderer.send(IPC.OrbDragEnd)
   },
 
   /** Model switcher (palette). */

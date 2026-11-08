@@ -5,19 +5,19 @@
 /* ── Design tokens ─────────────────────────────────────────────────────── */
 :root {
   color-scheme: dark;
-  /* Ash dark theme (default) */
+  /* Ash dark theme (default) — solid, professional */
+  --app-bg: #1c1c22;
   --app-text: #ececf1;
   --app-text-secondary: rgba(236, 236, 241, 0.62);
   --app-text-tertiary: rgba(236, 236, 241, 0.4);
-  --glass-bg: rgba(30, 30, 36, 0.78);
-  --glass-bg-strong: rgba(38, 38, 44, 0.9);
-  --glass-bg-soft: rgba(40, 40, 46, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.09);
-  --glass-border-strong: rgba(255, 255, 255, 0.16);
-  --app-input-bg: rgba(0, 0, 0, 0.32);
-  --app-code-bg: rgba(0, 0, 0, 0.4);
-  --shadow-card: 0 24px 70px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
-
+  --glass-bg: #26262e;
+  --glass-bg-strong: #2c2c34;
+  --glass-bg-soft: #303038;
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-strong: rgba(255, 255, 255, 0.14);
+  --app-input-bg: #1a1a20;
+  --app-code-bg: #141418;
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3);
   --text-primary: var(--app-text);
   --text-secondary: var(--app-text-secondary);
   --text-tertiary: var(--app-text-tertiary);
@@ -27,23 +27,24 @@
   --warning: #ffd60a;
   --danger: #ff453a;
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
-  --radius-card: 20px;
+  --radius-card: 16px;
 }
 
 html[data-theme='light'] {
   color-scheme: light;
-  /* Paper light theme */
+  /* Paper light theme — solid, professional */
+  --app-bg: #f5f5f3;
   --app-text: #17171c;
   --app-text-secondary: rgba(23, 23, 28, 0.6);
   --app-text-tertiary: rgba(23, 23, 28, 0.4);
-  --glass-bg: rgba(252, 252, 250, 0.92);
-  --glass-bg-strong: rgba(255, 255, 255, 0.96);
-  --glass-bg-soft: rgba(247, 247, 245, 0.85);
-  --glass-border: rgba(20, 20, 30, 0.1);
-  --glass-border-strong: rgba(20, 20, 30, 0.18);
-  --app-input-bg: rgba(20, 20, 30, 0.05);
-  --app-code-bg: rgba(20, 20, 30, 0.06);
-  --shadow-card: 0 24px 70px rgba(30, 30, 60, 0.16), 0 2px 8px rgba(30, 30, 60, 0.08);
+  --glass-bg: #ffffff;
+  --glass-bg-strong: #ffffff;
+  --glass-bg-soft: #f2f2f0;
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-border-strong: rgba(0, 0, 0, 0.14);
+  --app-input-bg: #f0f0ee;
+  --app-code-bg: #ededeb;
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 html[data-theme='dark'] {

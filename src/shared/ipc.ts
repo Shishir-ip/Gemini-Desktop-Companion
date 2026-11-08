@@ -53,6 +53,7 @@ export const IPC = {
   OrbOpen: 'orb:open',
   OrbDragStart: 'orb:drag-start',
   OrbDragMove: 'orb:drag-move',
+  OrbDragEnd: 'orb:drag-end',
   AppShowWidget: 'app:show-widget',
   WindowClose: 'window:close',
   WindowMinimize: 'window:minimize'

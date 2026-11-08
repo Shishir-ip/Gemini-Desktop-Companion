@@ -39,7 +39,6 @@ export function markOverlayReady(sender: Electron.WebContents): void {
 
 /** Freeze every display behind a full-screen selection overlay. */
 export async function startCircleToSearch(m: CircleMode = 'lens'): Promise<void> {
-  if (overlays.size > 0) return
   mode = m
   lensModeActive = false
 

@@ -27,7 +27,6 @@ import {
   destroyWidget,
   hideGeminiWidget,
   showGeminiWidget,
-  bindWidgetResizeIpc,
   forwardGeminiEvent,
   openPaletteFromOrb
 } from './windows/geminiWidget'
@@ -49,8 +48,6 @@ export function registerIpc(): void {
   gemini.on('chunk', (payload) => forwardEvent(IPC.GeminiChunk, payload))
   gemini.on('done', (payload) => forwardEvent(IPC.GeminiDone, payload))
   gemini.on('error', (payload) => forwardEvent(IPC.GeminiError, payload))
-
-  bindWidgetResizeIpc()
 
   // ── Circle to Search ─────────────────────────────────────────────────
   registerOverlayIpc()
