@@ -1,5 +1,5 @@
-import { BrowserWindow, screen } from 'electron'
-import type { Display } from 'electron'
+import { BrowserWindow, ipcMain, screen } from 'electron'
+import type { Display, Rectangle } from 'electron'
 import { IPC } from '../../shared/ipc'
 import { loadRendererPage, preloadPath } from '../paths'
 import { log } from '../logger'
@@ -8,6 +8,10 @@ import { showOrb, hideOrb } from './orb'
 let widget: BrowserWindow | null = null
 
 const READY_WATCHDOG_MS = 7000
+const WIDGET_WIDTH = 720
+const MIN_HEIGHT = 190
+const MAX_HEIGHT = 640
+const BOTTOM_MARGIN = 18
 
 function cursorDisplay(): Display {
   try {
@@ -18,33 +22,34 @@ function cursorDisplay(): Display {
 }
 
 /**
- * Show (or focus) the iOS-style floating Gemini command palette.
- * Resynchronizes the mouse-ignore state: hiding sets the window
- * click-through, and the renderer's local flag goes stale across
- * hide/show — without this resync the palette reopens visible but
- * untouchable (the "stops responding after close+reopen" bug).
+ * Show (or focus) the floating Gemini palette.
+ *
+ * The window is sized to EXACTLY fit the visible cards — there are no
+ * invisible interactive regions, so no setIgnoreMouseEvents/click-through
+ * machinery is used at all. That mechanism (forward-after-hide/show) was
+ * unreliable on Windows and left the palette visible but untouchable.
+ * The renderer reports its content height via WidgetResize and this module
+ * keeps the window bottom-anchored above the taskbar.
  */
 export function showGeminiWidget(): void {
   if (widget && !widget.isDestroyed()) {
     widget.show()
     widget.focus()
     widget.webContents.focus()
-    widget.setIgnoreMouseEvents(true, { forward: true })
     widget.webContents.send(IPC.WidgetShown)
     return
   }
 
   const display = cursorDisplay()
-  const width = 840
-  const height = 600
   const wa = display.workArea
-  const x = wa.x + Math.round((wa.width - width) / 2)
-  const y = wa.y + wa.height - height - Math.round(wa.height * 0.05)
+  const height = MIN_HEIGHT
+  const x = wa.x + Math.round((wa.width - WIDGET_WIDTH) / 2)
+  const y = wa.y + wa.height - height - BOTTOM_MARGIN
 
   widget = new BrowserWindow({
     x,
     y,
-    width,
+    width: WIDGET_WIDTH,
     height,
     show: false,
     frame: false,
@@ -64,10 +69,6 @@ export function showGeminiWidget(): void {
     }
   })
   widget.setAlwaysOnTop(true, 'screen-saver')
-  // Start fully click-through: the invisible regions of this window must
-  // never swallow desktop clicks. The renderer flips this off whenever the
-  // pointer is over a glass card (forward:true keeps hover events flowing).
-  widget.setIgnoreMouseEvents(true, { forward: true })
 
   // ── Safety rails: a failed renderer must never leave an invisible
   //    interactive blocker over the desktop/taskbar. ────────────────────────
@@ -105,6 +106,7 @@ export function showGeminiWidget(): void {
     if (!widget || widget.isDestroyed()) return
     widget.show()
     widget.focus()
+    widget.webContents.focus()
     widget.webContents.invalidate()
   })
   widget.on('closed', () => {
@@ -113,6 +115,18 @@ export function showGeminiWidget(): void {
   })
 
   loadRendererPage(widget, 'gemini')
+}
+
+/** Resize the palette window, keeping its bottom edge anchored. */
+export function resizeWidgetTo(height: number): void {
+  if (!widget || widget.isDestroyed()) return
+  const b = widget.getBounds()
+  const display = screen.getDisplayNearestPoint({ x: b.x + b.width / 2, y: b.y + b.height / 2 })
+  const wa = display.workArea
+  const clamped = Math.round(Math.min(Math.max(height, MIN_HEIGHT), MAX_HEIGHT, wa.height - BOTTOM_MARGIN - 8))
+  if (clamped === b.height) return
+  const nextY = wa.y + wa.height - clamped - BOTTOM_MARGIN
+  widget.setBounds({ x: b.x, y: nextY, width: WIDGET_WIDTH, height: clamped })
 }
 
 function destroyWidget(): void {
@@ -127,8 +141,6 @@ function destroyWidget(): void {
 export function hideGeminiWidget(opts?: { orb?: boolean }): void {
   if (widget && !widget.isDestroyed()) {
     widget.hide()
-    // Reset to click-through so a hidden/shown window never blocks input.
-    widget.setIgnoreMouseEvents(true, { forward: true })
     if (opts?.orb) showOrb(widget.getBounds())
   }
 }
@@ -147,16 +159,17 @@ export function toggleGeminiWidget(): void {
   }
 }
 
-/** IPC: the renderer toggles click-through based on pointer position. */
-export function setWidgetIgnoreMouse(ignore: boolean): void {
-  if (widget && !widget.isDestroyed()) {
-    widget.setIgnoreMouseEvents(ignore, { forward: true })
-  }
+/** IPC: the renderer reports its content height; keep bottom anchored. */
+export function bindWidgetResizeIpc(): void {
+  ipcMain.on(IPC.WidgetResize, (_event, height: number) => {
+    resizeWidgetTo(Number(height))
+  })
 }
 
 export function isGeminiWidgetVisible(): boolean {
   return !!(widget && !widget.isDestroyed() && widget.isVisible())
 }
+
 /** Forward main-process session events into the widget renderer. */
 export function forwardGeminiEvent(channel: string, payload: unknown): void {
   if (widget && !widget.isDestroyed()) {

@@ -70,15 +70,10 @@ prompt.focus()
 
 window.addEventListener('focus', () => {
   prompt.focus()
-  // Resync click-through bookkeeping after hide/show cycles: the window
-  // restarts in click-through mode and our flag must match, or the palette
-  // reopens visible but untouchable.
-  ignoringMouse = true
   setBusy(false)
   refreshState().catch(console.error)
 })
 window.gdc.gemini.onShown(() => {
-  ignoringMouse = true
   prompt.focus()
   // CRITICAL: if the palette was closed mid-answer, the request was
   // cancelled without a done/error event — isBusy stayed true and every
@@ -328,35 +323,13 @@ async function saveKey(): Promise<void> {
   }
 }
 
-// Click on the empty area around the sheet closes the widget (iOS behavior).
-wrap.addEventListener('pointerdown', (e) => {
-  if (e.target === wrap) pip()
-})
-
-/* ── Click-through: invisible regions must never block the desktop ─────── */
-let ignoringMouse = true
-
-function applyIgnoreMouse(ignore: boolean): void {
-  if (ignore === ignoringMouse) return
-  ignoringMouse = ignore
-  void window.gdc.widget.setIgnoreMouse(ignore)
-}
-
-document.addEventListener('pointermove', (e) => {
-  const el = e.target as Element | null
-  const overCard = !!(el && typeof el.closest === 'function' && el.closest('.glass-card'))
-  applyIgnoreMouse(!overCard)
-})
-document.addEventListener('pointerout', (e) => {
-  if (!e.relatedTarget) applyIgnoreMouse(true)
-})
-
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     e.preventDefault()
     pip()
   }
 })
+
 
 async function submit(forceText?: string, isRetry = false): Promise<void> {
   if (isBusy) {

@@ -24,7 +24,7 @@ export const IPC = {
   GeminiPip: 'gemini:pip',
   GeminiStop: 'gemini:stop',
   WidgetShown: 'widget:shown',
-  WidgetSetIgnoreMouse: 'widget:set-ignore-mouse',
+  WidgetResize: 'widget:resize',
   GeminiApiChanged: 'gemini:api-changed', // main → widget renderer
   GeminiStatus: 'gemini:status', // main → renderer
   GeminiChunk: 'gemini:chunk', // main → renderer

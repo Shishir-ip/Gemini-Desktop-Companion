@@ -28,7 +28,7 @@ const IPC = {
   GeminiPip: 'gemini:pip',
   GeminiStop: 'gemini:stop',
   WidgetShown: 'widget:shown',
-  WidgetSetIgnoreMouse: 'widget:set-ignore-mouse',
+  WidgetResize: 'widget:resize',
   GeminiApiChanged: 'gemini:api-changed',
   GeminiStatus: 'gemini:status',
   GeminiChunk: 'gemini:chunk',
@@ -92,16 +92,17 @@ const api = {
     onError: (cb: Listener<unknown>) => subscribe(IPC.GeminiError, cb),
     onAttachment: (cb: Listener<unknown>) => subscribe(IPC.GeminiAttachmentChanged, cb),
     onApiChanged: (cb: Listener<unknown>) => subscribe(IPC.GeminiApiChanged, cb),
-    onShown: (cb: Listener<void>) => subscribe(IPC.WidgetShown, cb)
+    onShown: (cb: Listener<void>) => subscribe(IPC.WidgetShown, cb),
+    resize: (height: number) => ipcRenderer.send(IPC.WidgetResize, Math.round(height))
   },
 
   /**
-   * Click-through control for the transparent palette window: while true the
-   * window ignores mouse events entirely (desktop clicks pass through) but
-   * still receives forwarded hover moves so the renderer can flip it back.
+   * Palette self-sizing: the renderer reports its content height and the
+   * main process keeps the window bottom-anchored (window hugs the cards —
+   * no invisible interactive regions, no click-through machinery).
    */
   widget: {
-    setIgnoreMouse: (ignore: boolean) => ipcRenderer.invoke(IPC.WidgetSetIgnoreMouse, ignore)
+    resize: (height: number) => ipcRenderer.send(IPC.WidgetResize, Math.round(height))
   },
 
   /** Settings window. */

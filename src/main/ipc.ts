@@ -26,8 +26,8 @@ import {
 import {
   hideGeminiWidget,
   showGeminiWidget,
+  bindWidgetResizeIpc,
   forwardGeminiEvent,
-  setWidgetIgnoreMouse,
   openPaletteFromOrb
 } from './windows/geminiWidget'
 import { openSettings, pushApiChanged } from './windows/settingsWindow'
@@ -48,6 +48,8 @@ export function registerIpc(): void {
   gemini.on('chunk', (payload) => forwardEvent(IPC.GeminiChunk, payload))
   gemini.on('done', (payload) => forwardEvent(IPC.GeminiDone, payload))
   gemini.on('error', (payload) => forwardEvent(IPC.GeminiError, payload))
+
+  bindWidgetResizeIpc()
 
   // ── Circle to Search ─────────────────────────────────────────────────
   registerOverlayIpc()
@@ -108,9 +110,6 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.GeminiPip, () => hideGeminiWidget({ orb: true }))
   // Stop = cancel the in-flight answer (partial text stays).
   ipcMain.handle(IPC.GeminiStop, () => gemini.cancelActive())
-  ipcMain.handle(IPC.WidgetSetIgnoreMouse, (_event, ignore: boolean) => {
-    setWidgetIgnoreMouse(Boolean(ignore))
-  })
 
   // ── Settings ─────────────────────────────────────────────────────────
   ipcMain.handle(IPC.SettingsGetAll, () => ({
