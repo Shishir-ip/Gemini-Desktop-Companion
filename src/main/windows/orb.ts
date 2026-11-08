@@ -3,13 +3,38 @@ import type { Display, Rectangle } from 'electron'
 import path from 'node:path'
 import { loadRendererPage } from '../paths'
 import { log } from '../logger'
+import { store } from '../store'
 
 /**
- * The draggable Gemini orb — the palette's minimize target. Click reopens
- * the palette with full context; drag moves it anywhere on screen.
+ * The Gemini orb — a clean, professional notch on the screen edge.
+ * Not draggable. Fixed to the left or right screen edge (middle height),
+ * as set in Settings. Clicking it reopens the palette with full context.
  */
 
 let orb: BrowserWindow | null = null
+let bound = false
+
+const ORB_SIZE = 52
+
+export function getOrbSide(): 'left' | 'right' {
+  return (store.get('orbPosition') as 'left' | 'right') ?? 'right'
+}
+
+export function setOrbSide(side: 'left' | 'right'): void {
+  store.set('orbPosition', side)
+  if (orb && !orb.isDestroyed() && orb.isVisible()) {
+    const pos = getOrbPosition(displayForBounds(orb.getBounds()))
+    orb.setPosition(pos.x, pos.y)
+  }
+}
+
+function getOrbPosition(display: Display): { x: number; y: number } {
+  const side = getOrbSide()
+  const wa = display.workArea
+  const x = side === 'left' ? wa.x + 6 : wa.x + wa.width - ORB_SIZE - 6
+  const y = wa.y + Math.round((wa.height - ORB_SIZE) / 2)
+  return { x, y }
+}
 
 function cursorDisplay(): Display {
   try {
@@ -17,6 +42,13 @@ function cursorDisplay(): Display {
   } catch {
     return screen.getPrimaryDisplay()
   }
+}
+
+export function getOrbBounds(): Rectangle {
+  if (orb && !orb.isDestroyed()) return orb.getBounds()
+  const display = cursorDisplay()
+  const pos = getOrbPosition(display)
+  return { x: pos.x, y: pos.y, width: ORB_SIZE, height: ORB_SIZE }
 }
 
 function displayForBounds(b: Rectangle): Display {
@@ -27,66 +59,21 @@ function displayForBounds(b: Rectangle): Display {
   }
 }
 
-function clampToWorkArea(wa: Rectangle, x: number, y: number, w: number, h: number): { x: number; y: number } {
-  return {
-    x: Math.min(Math.max(wa.x, x), wa.x + wa.width - w),
-    y: Math.min(Math.max(wa.y, y), wa.y + wa.height - h)
-  }
-}
-
-// Drag wiring: the orb renderer reports screen-space deltas while dragging.
-let last: { x: number; y: number } | null = null
-let bound = false
-function bindDragIpc(): void {
-  if (bound) return
-  bound = true
-  ipcMain.on('orb:drag-start', (event) => {
-    const w = BrowserWindow.fromWebContents(event.sender)
-    if (w) {
-      const b = w.getBounds()
-      last = { x: b.x, y: b.y }
-    }
-  })
-  ipcMain.on('orb:drag-move', (event, dx: number, dy: number) => {
-    const w = BrowserWindow.fromWebContents(event.sender)
-    if (!w || !last) return
-    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return
-    try {
-      const b = w.getBounds()
-      const target = displayForBounds(b)
-      const next = clampToWorkArea(target.workArea, b.x + dx, b.y + dy, b.width, b.height)
-      w.setPosition(next.x, next.y)
-    } catch (err) {
-      log(`[orb] drag-move failed: ${String(err)}`)
-    }
-  })
-}
-
-/** Show the orb near the bottom-right of the given rect (or cursor display). */
-export function showOrb(near?: Rectangle): void {
+/** Show the orb at its fixed edge position with a scale-in animation. */
+export function showOrb(_near?: Rectangle): void {
+  bindIpc()
   if (orb && !orb.isDestroyed()) {
     orb.show()
     return
   }
-  bindDragIpc()
-  const display = near
-    ? screen.getDisplayNearestPoint({ x: near.x + near.width - 40, y: near.y + near.height - 40 })
-    : cursorDisplay()
-  const size = 62
-  const wa = display.workArea
-  const base = near ?? {
-    x: wa.x + wa.width - 120,
-    y: wa.y + wa.height - 120,
-    width: 0,
-    height: 0
-  }
-  const pos = clampToWorkArea(wa, base.x + base.width - size - 8, base.y + base.height - size - 8, size, size)
+  const display = cursorDisplay()
+  const pos = getOrbPosition(display)
 
   orb = new BrowserWindow({
     x: pos.x,
     y: pos.y,
-    width: size,
-    height: size,
+    width: ORB_SIZE,
+    height: ORB_SIZE,
     show: false,
     frame: false,
     transparent: true,
@@ -111,10 +98,9 @@ export function showOrb(near?: Rectangle): void {
 
   loadRendererPage(orb, 'orb')
   orb.once('ready-to-show', () => {
-    if (orb && !orb.isDestroyed()) {
-      orb.show()
-      log('[orb] shown')
-    }
+    if (!orb || orb.isDestroyed()) return
+    orb.show()
+    log('[orb] shown')
   })
 }
 
@@ -125,4 +111,12 @@ export function hideOrb(): void {
 export function destroyOrb(): void {
   if (orb && !orb.isDestroyed()) orb.destroy()
   orb = null
+}
+
+function bindIpc(): void {
+  if (bound) return
+  bound = true
+  ipcMain.handle('orb:open', () => {
+    void import('./geminiWidget').then(({ openPaletteFromOrb }) => openPaletteFromOrb())
+  })
 }

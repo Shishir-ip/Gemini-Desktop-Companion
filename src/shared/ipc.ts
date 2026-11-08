@@ -45,6 +45,8 @@ export const IPC = {
   SettingsOpenApiKeys: 'settings:open-apikeys',
   SettingsCheckUpdates: 'settings:check-updates',
   SettingsSetTheme: 'settings:set-theme',
+  SettingsSetOrbSide: 'settings:set-orb-side',
+  OrbSideChanged: 'orb-side:changed',
   ApiChanged: 'api:changed', // main → UIs
 
   // ── Generic ─────────────────────────────────────────────────────────────

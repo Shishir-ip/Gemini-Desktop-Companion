@@ -1,4 +1,4 @@
-/* The draggable Gemini orb — minimize target for the palette. */
+/* The Gemini orb — a clean, professional notch on the screen edge. */
 
 html,
 body {
@@ -12,39 +12,45 @@ body {
 #orb {
   position: fixed;
   inset: 0;
-  width: 60px;
-  height: 60px;
+  width: 52px;
+  height: 52px;
   border-radius: 999px;
-  background: radial-gradient(circle at 32% 28%, rgba(52, 54, 66, 0.96), rgba(16, 16, 20, 0.96));
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  /* Proper circular glow: layered soft shadows hugging the round shape. */
-  box-shadow:
-    0 0 0 1px rgba(126, 166, 255, 0.10),
-    0 0 18px rgba(126, 166, 255, 0.22),
-    0 0 42px rgba(168, 85, 247, 0.16),
-    0 8px 28px rgba(0, 0, 0, 0.5);
+  background: #1c1c22;
+  border: 1.5px solid rgba(126, 166, 255, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: box-shadow 220ms var(--ease-ios, ease), transform 220ms var(--ease-ios, ease);
   user-select: none;
   -webkit-user-select: none;
+  transition: transform 180ms cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 180ms cubic-bezier(0.32, 0.72, 0, 1);
+  animation: orb-in 280ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
+
 #orb:hover {
-  transform: scale(1.06);
-  box-shadow:
-    0 0 0 1px rgba(126, 166, 255, 0.22),
-    0 0 24px rgba(126, 166, 255, 0.38),
-    0 0 60px rgba(168, 85, 247, 0.26),
-    0 10px 34px rgba(0, 0, 0, 0.55);
+  transform: scale(1.1);
+  border-color: rgba(126, 166, 255, 0.55);
 }
+
 #orb:active {
-  transform: scale(0.95);
+  transform: scale(0.92);
 }
+
 #orb img {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   pointer-events: none;
+}
+
+@keyframes orb-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

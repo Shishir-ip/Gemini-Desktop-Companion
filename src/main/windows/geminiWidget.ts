@@ -1,9 +1,10 @@
 import { BrowserWindow, ipcMain, screen } from 'electron'
-import type { Display } from 'electron'
+import type { Display, Rectangle } from 'electron'
 import { IPC } from '../../shared/ipc'
 import { loadRendererPage, preloadPath } from '../paths'
 import { log } from '../logger'
-import { showOrb, hideOrb } from './orb'
+import { showOrb, hideOrb, getOrbBounds } from './orb'
+import { animateWindowBounds } from '../animate'
 
 let widget: BrowserWindow | null = null
 
@@ -124,10 +125,42 @@ export function hideGeminiWidget(opts?: { orb?: boolean }): void {
   }
 }
 
-/** Orb click → reopen the palette (context preserved). */
+/**
+ * Orb click → animate the orb expanding toward the palette position,
+ * then hide the orb and show the palette with full context.
+ */
 export function openPaletteFromOrb(): void {
+  if (!widget || widget.isDestroyed()) {
+    hideOrb()
+    showGeminiWidget()
+    return
+  }
+  // Animate the orb moving to the palette's position, then swap.
+  const orbBounds = hideOrbAndGetBounds()
+  if (orbBounds) {
+    const target = {
+      x: orbBounds.x + orbBounds.width / 2 - widget.getBounds().width / 2,
+      y: Math.max(0, orbBounds.y - 100)
+    }
+    // Animate the palette appearing from the orb position.
+    const current = widget.getBounds()
+    widget.setBounds({ ...current, x: target.x, y: target.y })
+    widget.show()
+    animateWindowBounds(widget, { ...current, x: target.x, y: target.y }, current, 250)
+  } else {
+    widget.show()
+  }
+  widget.focus()
+  widget.webContents.focus()
+  log('[widget] reopened from orb')
+}
+
+function hideOrbAndGetBounds(): Rectangle | null {
+  // We need the orb bounds before hiding it.
+  const { getOrbBounds } = require('./orb') as typeof import('./orb')
+  const bounds = getOrbBounds()
   hideOrb()
-  showGeminiWidget()
+  return bounds
 }
 
 export function toggleGeminiWidget(): void {

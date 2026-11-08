@@ -120,6 +120,7 @@ export function registerIpc(): void {
     startup: isLaunchAtStartup(),
     api: gemini.getState(),
     theme: store.get('theme'),
+    orbPosition: store.get('orbPosition'),
     isDev: !app.isPackaged
   }))
   ipcMain.handle(
@@ -161,6 +162,16 @@ export function registerIpc(): void {
   })
   ipcMain.handle(IPC.SettingsOpen, () => openSettings())
   ipcMain.handle(IPC.SettingsCheckUpdates, () => checkForUpdates(true))
+  ipcMain.handle(IPC.SettingsSetOrbSide, (_event, side: string) => {
+    const s = ['left', 'right'].includes(side) ? side : 'right'
+    store.set('orbPosition', s)
+    const { setOrbSide } = require('./windows/orb') as typeof import('./windows/orb')
+    setOrbSide(s as 'left' | 'right')
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send(IPC.OrbSideChanged, s)
+    }
+    return s
+  })
   ipcMain.handle(IPC.SettingsSetTheme, (_event, theme: string) => {
     const t = ['auto', 'dark', 'light'].includes(theme) ? theme : 'dark'
     store.set('theme', t)
