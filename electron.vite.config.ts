@@ -28,7 +28,6 @@ export default defineConfig({
           gemini: resolve(__dirname, 'src/renderer/gemini/index.html'),
           settings: resolve(__dirname, 'src/renderer/settings/index.html'),
           home: resolve(__dirname, 'src/renderer/home/index.html'),
-          orb: resolve(__dirname, 'src/renderer/orb/index.html')
         }
       }
     }
