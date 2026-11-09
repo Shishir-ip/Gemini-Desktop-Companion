@@ -57,7 +57,6 @@ async function loadAll(): Promise<void> {
   applyRegistration(current.registration)
   applyApi(current.api)
   applyThemeButtons(current.theme)
-  applyOrbButtons(current.orbPosition)
 }
 
 function applyRegistration(reg: RegistrationStatus): void {
@@ -237,19 +236,6 @@ themeButtons.forEach((b) =>
 )
 window.gdc.settings.onThemeChanged((t) => applyThemeButtons(String(t)))
 
-/* ── Orb position picker ───────────────────────────────────────────── */
-const orbButtons = Array.from(document.querySelectorAll('#orb-picker .seg-btn')) as HTMLButtonElement[]
-function applyOrbButtons(side: string): void {
-  for (const b of orbButtons) b.classList.toggle('active', b.dataset.side === side)
-}
-
-orbButtons.forEach((b) =>
-  b.addEventListener('click', () => {
-    void window.gdc.settings.setOrbSide(b.dataset.side ?? 'right')
-  })
-)
-window.gdc.settings.onOrbSideChanged((side) => applyOrbButtons(String(side)))
-
 /* ── Startup toggle ────────────────────────────────────────────────────── */
 function setStartupToggle(on: boolean): void {
   toggleStartup.classList.toggle('on', on)
@@ -291,7 +277,7 @@ function applyApi(state: ApiState): void {
     keyRow.hidden = false
     btnChangeKey.hidden = true
   }
-  modelSub.textContent = state.model || 'gemini-3.8-flash'
+  modelSub.textContent = state.model || 'gemini-3.6-flash'
 }
 
 async function saveKey(): Promise<void> {

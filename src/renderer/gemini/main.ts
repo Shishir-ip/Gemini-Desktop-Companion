@@ -157,11 +157,11 @@ function setApiState(state: ApiState): void {
     prompt.placeholder = 'Ask Gemini anything…'
     autoSize()
   }
-  chip38.classList.toggle('active', state.model === 'gemini-3.8-flash')
+  chip38.classList.toggle('active', state.model === 'gemini-3.6-flash')
   chip35.classList.toggle('active', state.model === 'gemini-3.5-flash-lite')
 }
 
-chip38.addEventListener('click', () => void switchModel('gemini-3.8-flash'))
+chip38.addEventListener('click', () => void switchModel('gemini-3.6-flash'))
 chip35.addEventListener('click', () => void switchModel('gemini-3.5-flash-lite'))
 
 async function switchModel(model: string): Promise<void> {
