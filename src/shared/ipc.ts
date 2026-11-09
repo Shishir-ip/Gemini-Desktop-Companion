@@ -22,6 +22,7 @@ export const IPC = {
   GeminiRemoveAttachment: 'gemini:remove-attachment',
   GeminiNewChat: 'gemini:new-chat',
   GeminiClose: 'gemini:close',
+  GeminiMinimize: 'gemini:minimize',
   GeminiPip: 'gemini:pip',
   GeminiStop: 'gemini:stop',
   WidgetShown: 'widget:shown',

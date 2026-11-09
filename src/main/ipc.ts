@@ -23,13 +23,12 @@ import {
   closePanel,
   getPanelWindow
 } from './windows/resultsPanel'
-import { hideOrb } from './windows/orb'
 import {
   destroyWidget,
   hideGeminiWidget,
   showGeminiWidget,
-  forwardGeminiEvent,
-  openPaletteFromOrb
+  minimizeWidget,
+  forwardGeminiEvent
 } from './windows/geminiWidget'
 import { openSettings, pushApiChanged } from './windows/settingsWindow'
 import { log } from './logger'
@@ -105,17 +104,11 @@ export function registerIpc(): void {
   // Reopening builds a brand-new palette (first-launch state) — no stale
   // window state can persist.
   ipcMain.handle(IPC.GeminiClose, () => {
-    hideGeminiWidget()
     destroyWidget()
     gemini.resetChat()
   })
-  // PIP = minimize into the orb; conversation continues.
-  ipcMain.handle(IPC.GeminiPip, () => hideGeminiWidget({ orb: true }))
-  // Orb click → hide the orb and reopen the palette (context preserved).
-  ipcMain.handle(IPC.OrbOpen, () => {
-    hideOrb()
-    showGeminiWidget()
-  })
+  // Minimize to the Windows taskbar — chat + context persist.
+  ipcMain.handle(IPC.GeminiMinimize, () => minimizeWidget())
   // Stop = cancel the in-flight answer (partial text stays).
   ipcMain.handle(IPC.GeminiStop, () => gemini.cancelActive())
 
@@ -127,7 +120,6 @@ export function registerIpc(): void {
     startup: isLaunchAtStartup(),
     api: gemini.getState(),
     theme: store.get('theme'),
-    orbPosition: store.get('orbPosition'),
     isDev: !app.isPackaged
   }))
   ipcMain.handle(
@@ -169,16 +161,6 @@ export function registerIpc(): void {
   })
   ipcMain.handle(IPC.SettingsOpen, () => openSettings())
   ipcMain.handle(IPC.SettingsCheckUpdates, () => checkForUpdates(true))
-  ipcMain.handle(IPC.SettingsSetOrbSide, (_event, side: string) => {
-    const s = ['left', 'right'].includes(side) ? side : 'right'
-    store.set('orbPosition', s)
-    const { setOrbSide } = require('./windows/orb') as typeof import('./windows/orb')
-    setOrbSide(s as 'left' | 'right')
-    for (const win of BrowserWindow.getAllWindows()) {
-      win.webContents.send(IPC.OrbSideChanged, s)
-    }
-    return s
-  })
   ipcMain.handle(IPC.SettingsSetTheme, (_event, theme: string) => {
     const t = ['auto', 'dark', 'light'].includes(theme) ? theme : 'dark'
     store.set('theme', t)
@@ -193,7 +175,6 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.AppOpenExternal, (_event, url: string) => openExternalUrl(url))
   ipcMain.handle(IPC.AppStartCircle, () => void startCircleToSearch('lens'))
   ipcMain.handle(IPC.AppShowWidget, () => showGeminiWidget())
-  ipcMain.handle(IPC.OrbOpen, () => openPaletteFromOrb())
   ipcMain.handle(IPC.WindowMinimize, (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize()
   })

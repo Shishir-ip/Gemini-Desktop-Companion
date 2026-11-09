@@ -26,6 +26,7 @@ const IPC = {
   GeminiRemoveAttachment: 'gemini:remove-attachment',
   GeminiNewChat: 'gemini:new-chat',
   GeminiClose: 'gemini:close',
+  GeminiMinimize: 'gemini:minimize',
   GeminiPip: 'gemini:pip',
   GeminiStop: 'gemini:stop',
   WidgetShown: 'widget:shown',
@@ -91,7 +92,7 @@ const api = {
     removeAttachment: () => ipcRenderer.invoke(IPC.GeminiRemoveAttachment),
     newChat: () => ipcRenderer.invoke(IPC.GeminiNewChat),
     close: () => ipcRenderer.invoke(IPC.GeminiClose),
-    pip: () => ipcRenderer.invoke(IPC.GeminiPip),
+    minimize: () => ipcRenderer.invoke(IPC.GeminiMinimize),
     stop: () => ipcRenderer.invoke(IPC.GeminiStop),
     onStatus: (cb: Listener<unknown>) => subscribe(IPC.GeminiStatus, cb),
     onChunk: (cb: Listener<unknown>) => subscribe(IPC.GeminiChunk, cb),
@@ -99,8 +100,7 @@ const api = {
     onError: (cb: Listener<unknown>) => subscribe(IPC.GeminiError, cb),
     onAttachment: (cb: Listener<unknown>) => subscribe(IPC.GeminiAttachmentChanged, cb),
     onApiChanged: (cb: Listener<unknown>) => subscribe(IPC.GeminiApiChanged, cb),
-    onShown: (cb: Listener<void>) => subscribe(IPC.WidgetShown, cb),
-    resize: (height: number) => ipcRenderer.send(IPC.WidgetResize, Math.round(height))
+    onShown: (cb: Listener<void>) => subscribe(IPC.WidgetShown, cb)
   },
 
   /**

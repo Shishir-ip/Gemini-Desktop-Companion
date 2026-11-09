@@ -43,7 +43,8 @@ const prompt = document.getElementById('prompt') as HTMLTextAreaElement
 const sendBtn = document.getElementById('btn-send') as HTMLButtonElement
 const attachBtn = document.getElementById('btn-attach') as HTMLButtonElement
 const closeBtn = document.getElementById('btn-close') as HTMLButtonElement
-const pipBtn = document.getElementById('btn-pip') as HTMLButtonElement
+const minimizeBtn = document.getElementById('btn-minimize') as HTMLButtonElement
+const micBtn = document.getElementById('btn-mic') as HTMLButtonElement
 const settingsBtn = document.getElementById('btn-settings') as HTMLButtonElement
 
 let attachment: Attachment | null = null
@@ -116,6 +117,7 @@ function renderChatLog(log: Array<{ role: 'user' | 'model'; text: string }>): vo
       activeBubbleRaw = entry.text
       ;(activeBubble as { setText: (html: string) => void } | null)?.setText(renderMarkdown(activeBubbleRaw))
       activeBubble = null // finalized — no streaming cursor
+      decorateCodeBlocks()
     }
   }
   if (log.length > 0) {
@@ -207,6 +209,43 @@ function appendModelBubble(): void {
 
 let activeBubbleRaw = ''
 
+/* ── Voice typing (Web Speech API) ─────────────────────────────────────── */
+let micActive = false
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let recognition: any = null
+
+micBtn.addEventListener('click', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
+  if (!SR) {
+    micBtn.title = 'Voice typing not supported'
+    return
+  }
+  if (micActive) {
+    recognition?.stop()
+    return
+  }
+  recognition = new SR()
+  recognition.continuous = false
+  recognition.interimResults = true
+  recognition.lang = 'en-US'
+  recognition.onresult = (event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => {
+    let transcript = ''
+    for (let i = 0; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript
+    }
+    prompt.value = transcript
+    prompt.dispatchEvent(new Event('input'))
+  }
+  recognition.onend = () => {
+    micActive = false
+    micBtn.classList.remove('mic-active')
+  }
+  recognition.start()
+  micActive = true
+  micBtn.classList.add('mic-active')
+})
+
 /* ── Events from main ──────────────────────────────────────────────────── */
 window.gdc.gemini.onAttachment((payload) => setAttachment(payload as Attachment | null))
 window.gdc.gemini.onApiChanged((payload) => setApiState(payload as ApiState))
@@ -230,6 +269,7 @@ window.gdc.gemini.onChunk((payload) => {
   if (!activeBubble) appendModelBubble()
   activeBubbleRaw = p.full
   activeBubble?.setText(renderMarkdown(activeBubbleRaw))
+  decorateCodeBlocks()
   scrollMessages()
 })
 window.gdc.gemini.onDone((payload) => {
@@ -281,10 +321,9 @@ closeBtn.addEventListener('click', () => {
   document.body.classList.add('closing')
   setTimeout(() => void window.gdc.gemini.close(), 150)
 })
-pipBtn.addEventListener('click', () => {
-  // PIP = minimize into the floating orb; chat + context keep running.
-  document.body.classList.add('closing')
-  setTimeout(() => void window.gdc.gemini.pip(), 150)
+minimizeBtn.addEventListener('click', () => {
+  // Minimize to the Windows taskbar — chat + context persist.
+  void window.gdc.gemini.minimize()
 })
 settingsBtn.addEventListener('click', () => void window.gdc.settings.open())
 newChatBtn.addEventListener('click', () => {
@@ -355,7 +394,7 @@ async function saveKey(): Promise<void> {
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     e.preventDefault()
-    pip()
+    minimizeToTaskbar()
   }
 })
 
@@ -424,9 +463,8 @@ function close(): void {
   setTimeout(() => void window.gdc.gemini.close(), 150)
 }
 
-function pip(): void {
-  document.body.classList.add('closing')
-  setTimeout(() => void window.gdc.gemini.pip(), 150)
+function minimizeToTaskbar(): void {
+  void window.gdc.gemini.minimize()
 }
 
 function autoSize(): void {
@@ -485,6 +523,39 @@ function renderMarkdown(src: string): string {
   text = text.replace(/\n/g, '<br>')
   return text
 }
+
+/* ── Code copy: add copy buttons to code blocks after render ──────────── */
+function decorateCodeBlocks(): void {
+  messages.querySelectorAll('pre.code').forEach((el) => {
+    const pre = el as HTMLElement
+    if (pre.querySelector('.code-copy')) return
+    const btn = document.createElement('button')
+    btn.className = 'code-copy'
+    btn.textContent = 'Copy'
+    btn.addEventListener('click', () => {
+      const code = pre.querySelector('code')?.textContent ?? pre.textContent ?? ''
+      void navigator.clipboard.writeText(code).then(() => {
+        btn.textContent = '✓ Copied'
+        setTimeout(() => (btn.textContent = 'Copy'), 1600)
+      })
+    })
+    pre.style.position = 'relative'
+    pre.appendChild(btn)
+  })
+}
+
+// Delegated handler — works for dynamically rendered code blocks.
+messages.addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest('.code-copy')
+  if (!btn) return
+  const pre = btn.closest('pre.code')
+  if (!pre) return
+  const code = pre.querySelector('code')?.textContent ?? pre.textContent ?? ''
+  void navigator.clipboard.writeText(code).then(() => {
+    btn.textContent = '✓ Copied'
+    setTimeout(() => (btn.textContent = 'Copy'), 1600)
+  })
+})
 
 // Links open in the user's real browser.
 messages.addEventListener('click', (e) => {

@@ -492,3 +492,47 @@ body.shown #wrap #response-card {
     transform: translateY(0) scale(1);
   }
 }
+
+/* ── Code copy button ──────────────────────────────────────────────────── */
+.code-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--app-code-bg);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  z-index: 1;
+}
+pre.code:hover .code-copy {
+  opacity: 1;
+}
+pre.code:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* ── Mic button active state ───────────────────────────────────────────── */
+.icon-btn.mic-active {
+  color: var(--danger);
+  background: rgba(255, 69, 58, 0.12);
+  animation: mic-pulse 1.2s ease infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 69, 58, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 69, 58, 0.1); }
+}
+
+/* ── Movable header (drag region) ──────────────────────────────────────── */
+.header-row {
+  -webkit-app-region: drag;
+}
+.header-row .icon-btn,
+.header-row .spacer {
+  -webkit-app-region: no-drag;
+}

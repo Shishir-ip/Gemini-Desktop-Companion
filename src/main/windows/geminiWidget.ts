@@ -1,10 +1,8 @@
 import { BrowserWindow, ipcMain, screen } from 'electron'
-import type { Display, Rectangle } from 'electron'
+import type { Display } from 'electron'
 import { IPC } from '../../shared/ipc'
 import { loadRendererPage, preloadPath } from '../paths'
 import { log } from '../logger'
-import { showOrb, hideOrb, getOrbBounds } from './orb'
-import { animateWindowBounds } from '../animate'
 
 let widget: BrowserWindow | null = null
 
@@ -23,9 +21,8 @@ function cursorDisplay(): Display {
 /**
  * Show (or focus) the floating Gemini palette.
  *
- * SOLID window (no transparency, no click-through machinery) at a fixed
- * 720×480 — fully interactive the moment it opens, every time. Messages
- * scroll inside; an empty state shows when there's no chat yet.
+ * SOLID window (no transparency) at 720×480 — shows in the taskbar,
+ * can be minimized, fully interactive every time it opens.
  */
 export function showGeminiWidget(): void {
   if (widget && !widget.isDestroyed()) {
@@ -50,12 +47,13 @@ export function showGeminiWidget(): void {
     frame: false,
     transparent: false,
     resizable: false,
-    movable: false,
-    minimizable: false,
+    movable: true,
+    minimizable: true,
     maximizable: false,
-    skipTaskbar: true,
+    skipTaskbar: false,
     roundedCorners: true,
     backgroundColor: '#1c1c22',
+    title: 'Gemini',
     webPreferences: {
       preload: preloadPath('index'),
       contextIsolation: true,
@@ -91,7 +89,7 @@ export function showGeminiWidget(): void {
   })
   widget.webContents.on('before-input-event', (_event, input) => {
     if (input.type === 'keyDown' && input.key === 'Escape') {
-      hideGeminiWidget({ orb: true })
+      hideGeminiWidget()
     }
   })
   widget.once('ready-to-show', () => {
@@ -114,58 +112,19 @@ export function destroyWidget(): void {
   widget = null
 }
 
-/**
- * Hide the palette. `opts.orb` shows the draggable Gemini orb so the user
- * can reopen the conversation (chat + streams continue while hidden).
- */
-export function hideGeminiWidget(opts?: { orb?: boolean }): void {
-  if (widget && !widget.isDestroyed()) {
-    widget.hide()
-    if (opts?.orb) showOrb(widget.getBounds())
-  }
+/** Minimize to the Windows taskbar — chat and context persist. */
+export function minimizeWidget(): void {
+  if (widget && !widget.isDestroyed()) widget.minimize()
 }
 
-/**
- * Orb click → animate the orb expanding toward the palette position,
- * then hide the orb and show the palette with full context.
- */
-export function openPaletteFromOrb(): void {
-  if (!widget || widget.isDestroyed()) {
-    hideOrb()
-    showGeminiWidget()
-    return
-  }
-  // Animate the orb moving to the palette's position, then swap.
-  const orbBounds = hideOrbAndGetBounds()
-  if (orbBounds) {
-    const target = {
-      x: orbBounds.x + orbBounds.width / 2 - widget.getBounds().width / 2,
-      y: Math.max(0, orbBounds.y - 100)
-    }
-    // Animate the palette appearing from the orb position.
-    const current = widget.getBounds()
-    widget.setBounds({ ...current, x: target.x, y: target.y })
-    widget.show()
-    animateWindowBounds(widget, { ...current, x: target.x, y: target.y }, current, 250)
-  } else {
-    widget.show()
-  }
-  widget.focus()
-  widget.webContents.focus()
-  log('[widget] reopened from orb')
-}
-
-function hideOrbAndGetBounds(): Rectangle | null {
-  // We need the orb bounds before hiding it.
-  const { getOrbBounds } = require('./orb') as typeof import('./orb')
-  const bounds = getOrbBounds()
-  hideOrb()
-  return bounds
+/** Hide the palette (chat context persists — clicking the taskbar restores). */
+export function hideGeminiWidget(): void {
+  if (widget && !widget.isDestroyed()) widget.hide()
 }
 
 export function toggleGeminiWidget(): void {
   if (widget && !widget.isDestroyed() && widget.isVisible()) {
-    hideGeminiWidget({ orb: true })
+    hideGeminiWidget()
   } else {
     showGeminiWidget()
   }
