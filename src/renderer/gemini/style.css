@@ -83,6 +83,21 @@ body.closing #input-card {
   border: 1px solid var(--glass-border);
   border-bottom-left-radius: 5px;
 }
+/* Attached screenshot inside a user bubble — stays visible in the log. */
+.bubble .shot-thumb {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  max-height: 130px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  margin-bottom: 6px;
+  cursor: zoom-in;
+}
+.msg.user .bubble:has(.shot-thumb) {
+  white-space: normal;
+}
 .bubble h3 {
   font-size: 13.5px;
   font-weight: 650;

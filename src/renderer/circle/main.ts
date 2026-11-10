@@ -22,65 +22,87 @@ let dragging = false
 let moved = false
 let startX = 0
 let startY = 0
+/** True once the frozen frame is painted — selection is gated on this. */
+let frozenReady = false
 
 init().catch((err) => {
   console.error('circle init failed', err)
   void window.gdc.circle.cancel()
 })
 
-async function init(): Promise<void> {
-  const capture = await window.gdc.circle.getCapture()
-  if (!capture) {
-    void window.gdc.circle.cancel()
-    return
-  }
-  mode = capture.mode
-  scaleFactor = capture.scaleFactor
+/** Push a dim-only state while desktopCapturer is still running. */
+function enterWaiting(m: CircleMode): void {
+  mode = m
+  frozenReady = false
+  lensMode = false
+  document.body.classList.remove('lens-mode')
+  resetSelection()
+  hintText.textContent = 'Capturing screen…'
+  attachHint.hidden = true
+  document.body.classList.add('ready')
+  // Painted (dim + hint) — clear the main-process ready watchdog now.
+  window.gdc.circle.ready()
+}
 
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve()
-    img.onerror = () => reject(new Error('screenshot decode failed'))
-    img.src = capture.dataUrl
-  })
-
-  // Mode-specific instructions — the #1 complaint was not knowing to drag.
+function setHints(): void {
+  hintText.textContent = 'Drag to select anything on screen'
+  attachHint.hidden = true
   if (mode === 'attach') {
     hintText.textContent = 'Drag over the region to attach'
     attachHint.hidden = false
   }
+}
 
+async function applyCapture(dataUrl: string, sf: number, m: CircleMode): Promise<void> {
+  mode = m
+  scaleFactor = sf
+  lensMode = false
+  document.body.classList.remove('lens-mode')
+  resetSelection()
+  setHints()
+  await new Promise<void>((resolve) => {
+    img.onload = () => resolve()
+    img.onerror = () => resolve() // Esc still works; main watchdog still armed
+    img.src = dataUrl
+  })
+  frozenReady = true
   // Smooth fade-in of the frozen screen.
   document.body.classList.add('ready')
-
-  // Paint one frame, then tell the main process we're alive and interactive
-  // (clears its dead-renderer watchdog).
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
   window.gdc.circle.ready()
+}
 
-  // Warm reuse: a fresh frozen frame pushed into this already-loaded page.
+async function init(): Promise<void> {
+  // Warm reuse pushes frames through onSetImage — listen BEFORE any await
+  // so an early frame can never race this setup.
   window.gdc.circle.onSetImage((payload) => {
-    const capture = payload as { dataUrl: string; scaleFactor: number; mode: CircleMode }
-    mode = capture.mode
-    scaleFactor = capture.scaleFactor
-    lensMode = false
-    document.body.classList.remove('lens-mode')
-    resetSelection()
-    img.onload = () => {
-      document.body.classList.add('ready')
-      window.gdc.circle.ready()
+    const p = payload as { dataUrl: string | null; scaleFactor: number; mode: CircleMode }
+    if (!p.dataUrl) {
+      enterWaiting(p.mode)
+      return
     }
-    img.src = capture.dataUrl
+    void applyCapture(p.dataUrl, p.scaleFactor, p.mode)
   })
 
-  window.gdc.circle.onSetLensMode(() => {
-    lensMode = true
-    document.body.classList.add('lens-mode')
-    selBox.style.display = 'none'
-    selBadge.hidden = true
-  })
+  const capture = await window.gdc.circle.getCapture()
+  if (capture) {
+    await applyCapture(capture.dataUrl, capture.scaleFactor, capture.mode)
+  } else {
+    // Instant open: the window was shown BEFORE the capture finished —
+    // hold the dim until the frozen frame arrives via onSetImage.
+    enterWaiting('lens')
+  }
 }
 
 /* ── Esc handling ──────────────────────────────────────────────────────── */
+// Results panel opened → the frozen screen relaxes into "click to dismiss".
+window.gdc.circle.onSetLensMode(() => {
+  lensMode = true
+  document.body.classList.add('lens-mode')
+  selBox.style.display = 'none'
+  selBadge.hidden = true
+})
+
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     e.preventDefault()
@@ -96,6 +118,8 @@ window.addEventListener('keydown', (e) => {
 
 /* ── Selection drag ────────────────────────────────────────────────────── */
 sel.addEventListener('pointerdown', (e) => {
+  // No frozen frame yet (still capturing) — a drag now would crop garbage.
+  if (!frozenReady) return
   if (lensMode) {
     // Any click on the frozen screen while results are open dismisses all.
     void window.gdc.circle.dismissAll()

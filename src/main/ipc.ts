@@ -31,6 +31,7 @@ import {
   forwardGeminiEvent
 } from './windows/geminiWidget'
 import { openSettings, pushApiChanged } from './windows/settingsWindow'
+import { startVoiceTyping } from './dictation'
 import { log } from './logger'
 
 /**
@@ -111,6 +112,9 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.GeminiMinimize, () => minimizeWidget())
   // Stop = cancel the in-flight answer (partial text stays).
   ipcMain.handle(IPC.GeminiStop, () => gemini.cancelActive())
+  // Mic button → Windows voice typing (Win+H). The renderer focuses the
+  // prompt first so dictation lands in it.
+  ipcMain.handle(IPC.GeminiDictate, () => startVoiceTyping())
 
   // ── Settings ─────────────────────────────────────────────────────────
   ipcMain.handle(IPC.SettingsGetAll, () => ({

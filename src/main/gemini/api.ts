@@ -59,7 +59,7 @@ export class GeminiApiClient extends EventEmitter {
   private history: ChatContent[] = []
   private historyEpoch = 0
   /** Display chat log — the single source of truth for the palette UI. */
-  private chatLog: Array<{ role: 'user' | 'model'; text: string }> = []
+  private chatLog: Array<{ role: 'user' | 'model'; text: string; image?: string }> = []
   private active = false
   private gen = 0
   private abortFn: (() => void) | null = null
@@ -172,7 +172,7 @@ export class GeminiApiClient extends EventEmitter {
   }
 
   /** Full display chat log — the palette re-renders from this on every open. */
-  getChatLog(): Array<{ role: 'user' | 'model'; text: string }> {
+  getChatLog(): Array<{ role: 'user' | 'model'; text: string; image?: string }> {
     return this.chatLog
   }
 
@@ -201,7 +201,14 @@ export class GeminiApiClient extends EventEmitter {
     const parts: ChatPart[] = [{ text: prompt }]
     if (imageB64) parts.push({ inline_data: { mime_type: 'image/png', data: imageB64 } })
     const contents: ChatContent[] = [...this.history, { role: 'user', parts }]
-    this.chatLog.push({ role: 'user', text: prompt })
+    // The display log keeps a data-URL thumbnail so the palette can re-render
+    // the screenshot on every reopen — otherwise it vanished after the next
+    // prompt (the exact bug this version fixes).
+    this.chatLog.push({
+      role: 'user',
+      text: prompt,
+      image: imageB64 ? `data:image/png;base64,${imageB64}` : undefined
+    })
     await this.streamOnce(contents, { persist: true, startedLabel: 'chat', target: 'widget', rateRetries: 3 })
   }
 

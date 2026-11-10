@@ -94,7 +94,7 @@ async function refreshState(): Promise<void> {
     const state = (await window.gdc.gemini.getState()) as {
       attachment: Attachment | null
       api: ApiState
-      chatLog: Array<{ role: 'user' | 'model'; text: string }>
+      chatLog: Array<{ role: 'user' | 'model'; text: string; image?: string }>
     }
     setAttachment(state.attachment)
     setApiState(state.api)
@@ -105,13 +105,13 @@ async function refreshState(): Promise<void> {
 }
 
 /** Re-render the full chat from the main-process chat log. */
-function renderChatLog(log: Array<{ role: 'user' | 'model'; text: string }>): void {
+function renderChatLog(log: Array<{ role: 'user' | 'model'; text: string; image?: string }>): void {
   messages.innerHTML = ''
   activeBubble = null
   activeBubbleRaw = ''
   for (const entry of log) {
     if (entry.role === 'user') {
-      appendUserBubble(entry.text)
+      appendUserBubble(entry.text, entry.image)
     } else {
       appendModelBubble()
       activeBubbleRaw = entry.text
@@ -150,6 +150,8 @@ function setApiState(state: ApiState): void {
     : 'Gemini not connected — paste a free API key'
   apiBanner.hidden = state.hasKey
   prompt.disabled = !state.hasKey
+  // The mic only makes sense once chat is usable — show it when connected.
+  micBtn.hidden = !state.hasKey
   if (!state.hasKey) {
     prompt.placeholder = 'Connect Gemini to start asking…'
     sendBtn.disabled = true
@@ -177,12 +179,22 @@ function scrollMessages(): void {
   messages.scrollTop = messages.scrollHeight
 }
 
-function appendUserBubble(text: string): void {
+function appendUserBubble(text: string, image?: string): void {
   const msg = document.createElement('div')
   msg.className = 'msg user'
   const bubble = document.createElement('div')
   bubble.className = 'bubble'
-  bubble.textContent = text
+  if (image) {
+    // Sent screenshots stay visible in the conversation (both live and on
+    // re-render from the chat log) instead of vanishing after the next prompt.
+    const img = document.createElement('img')
+    img.className = 'shot-thumb'
+    img.src = image
+    img.alt = 'attached screenshot'
+    img.addEventListener('click', () => window.open(image, '_blank'))
+    bubble.appendChild(img)
+  }
+  if (text) bubble.appendChild(document.createTextNode(text))
   msg.appendChild(bubble)
   messages.appendChild(msg)
   responseCard.hidden = false
@@ -209,41 +221,45 @@ function appendModelBubble(): void {
 
 let activeBubbleRaw = ''
 
-/* ── Voice typing (Web Speech API) ─────────────────────────────────────── */
+/* ── Voice typing (Windows dictation via Win+H) ────────────────────────── */
+// Chromium's SpeechRecognition is a dead end inside Electron (no Google
+// speech key — always fails with 'network'). The mic button instead focuses
+// the prompt and fires Win+H: Windows' own voice typing then types spoken
+// words straight into the focused textarea, like a real keyboard. Win+H is
+// a TOGGLE — clicking the mic again stops dictation.
 let micActive = false
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let recognition: any = null
+let micGlowTimer: ReturnType<typeof setTimeout> | null = null
+
+function setMicGlow(on: boolean): void {
+  micActive = on
+  micBtn.classList.toggle('mic-active', on)
+  if (micGlowTimer) {
+    clearTimeout(micGlowTimer)
+    micGlowTimer = null
+  }
+  if (on) {
+    // The glow fades when the OS dictation toolbar closes on its own
+    // (silence, Esc, or clicking away) — we can't observe that directly.
+    micGlowTimer = setTimeout(() => setMicGlow(false), 30_000)
+  } else {
+    micBtn.title = 'Voice typing'
+  }
+}
 
 micBtn.addEventListener('click', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
-  if (!SR) {
-    micBtn.title = 'Voice typing not supported'
-    return
-  }
-  if (micActive) {
-    recognition?.stop()
-    return
-  }
-  recognition = new SR()
-  recognition.continuous = false
-  recognition.interimResults = true
-  recognition.lang = 'en-US'
-  recognition.onresult = (event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => {
-    let transcript = ''
-    for (let i = 0; i < event.results.length; i++) {
-      transcript += event.results[i][0].transcript
+  const stopping = micActive
+  setMicGlow(!stopping)
+  if (stopping) micBtn.title = 'Voice typing'
+  // Dictation anchors to the keyboard-focused field.
+  prompt.focus()
+  void window.gdc.gemini.dictate().then((res) => {
+    if (!res?.ok) {
+      setMicGlow(false)
+      micBtn.title = res?.error ?? 'Voice typing failed to start'
+    } else if (!stopping) {
+      micBtn.title = 'Listening — click again to stop (or press Esc)'
     }
-    prompt.value = transcript
-    prompt.dispatchEvent(new Event('input'))
-  }
-  recognition.onend = () => {
-    micActive = false
-    micBtn.classList.remove('mic-active')
-  }
-  recognition.start()
-  micActive = true
-  micBtn.classList.add('mic-active')
+  })
 })
 
 /* ── Events from main ──────────────────────────────────────────────────── */
@@ -416,7 +432,7 @@ async function submit(forceText?: string, isRetry = false): Promise<void> {
   if (!text && !attachment && !isRetry) return
   lastPrompt = text || lastPrompt
   // The user prompt becomes a bubble; the answer streams below it.
-  appendUserBubble(text || '(screenshot)')
+  appendUserBubble(text || '(screenshot)', attachment?.dataUrl)
   prompt.value = ''
   autoSize()
   hideError()

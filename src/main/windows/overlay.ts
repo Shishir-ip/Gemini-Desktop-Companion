@@ -48,41 +48,54 @@ export async function startCircleToSearch(m: CircleMode = 'lens'): Promise<void>
   hideGeminiWidget()
   hideSettings()
 
-  try {
-    captures = await captureAllDisplays()
-  } catch (err) {
+  // INSTANT OPEN: the overlay windows go up BEFORE the capture finishes.
+  // desktopCapturer takes 300-1500ms — awaiting it before showing anything
+  // was the "circle to search takes a while to open" bug. The renderer
+  // paints a dim-only "Capturing screen…" state; frames are pushed through
+  // IPC.CircleSetImage the moment they exist.
+  captures = new Map() // stale frames from a previous session must not leak
+  const capturePromise = captureAllDisplays().catch((err) => {
     log(`[circle] capture failed: ${String(err)}`)
-    return
-  }
-  if (captures.size === 0) {
-    log('[circle] no displays captured — aborting (no blocker window will be shown)')
-    return
-  }
+    return null as Map<number, DisplayCapture> | null
+  })
 
-  for (const [displayId, capture] of captures) {
-    const display = screen.getAllDisplays().find((d) => d.id === displayId)
-    if (!display) continue
-    const existing = overlays.get(displayId)
+  for (const display of screen.getAllDisplays()) {
+    const existing = overlays.get(display.id)
     if (existing && !existing.isDestroyed()) {
-      // Warm reuse: overlay page is already loaded — push the new frozen
-      // frame and reshow. This is the fast path (no page load).
+      // Warm reuse: page already loaded — reset to waiting and reshow
+      // (no window/page load at all on the fast path).
       readyWindows.add(existing)
-      existing.webContents.send(IPC.CircleSetImage, {
-        dataUrl: capture.dataUrl,
-        scaleFactor: capture.scaleFactor,
-        mode
-      })
+      existing.webContents.send(IPC.CircleSetImage, { dataUrl: null, scaleFactor: 1, mode })
       existing.show()
       existing.focus()
       log('[circle] overlay reused (fast path)')
       continue
     }
-    createOverlay(display, displayId, capture)
+    createOverlay(display, display.id)
   }
-  log(`[circle] overlays created (mode: ${m}, displays: ${captures.size})`)
+  log(`[circle] overlays shown instantly (mode: ${m}, displays: ${screen.getAllDisplays().length})`)
+
+  const caps = await capturePromise
+  if (!caps || caps.size === 0) {
+    // Nothing captured — overlays must NOT linger as invisible input blocks.
+    log('[circle] no displays captured — closing overlays')
+    closeAllSearchUI()
+    return
+  }
+  captures = caps
+  for (const [displayId, capture] of caps) {
+    const win = overlays.get(displayId)
+    if (!win || win.isDestroyed()) continue
+    win.webContents.send(IPC.CircleSetImage, {
+      dataUrl: capture.dataUrl,
+      scaleFactor: capture.scaleFactor,
+      mode
+    })
+  }
+  log(`[circle] frozen frames pushed (${caps.size} displays)`)
 }
 
-function createOverlay(display: Display, displayId: number, capture: DisplayCapture): void {
+function createOverlay(display: Display, displayId: number): void {
   const win = new BrowserWindow({
     x: display.bounds.x,
     y: display.bounds.y,
@@ -109,7 +122,8 @@ function createOverlay(display: Display, displayId: number, capture: DisplayCapt
   win.setAlwaysOnTop(true, 'screen-saver')
   windowDisplay.set(win, displayId)
   overlays.set(displayId, win)
-  void capture // fetched by the renderer via IPC.CircleGetCapture
+  // The frozen frame arrives via IPC.CircleSetImage once captured (or via
+  // IPC.CircleGetCapture if the renderer loads after the capture finished).
 
   // ── Safety rails: an overlay must NEVER linger as an invisible
   //    input-blocking window. Any failure path destroys it. ────────────────

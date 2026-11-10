@@ -49,7 +49,7 @@ No manual API key setup — sign in with Google once via your real browser and y
 | **💬 Hold to Gemini** | A floating chat palette powered by the **official Gemini API**. Ask anything, attach screenshots, switch between models, and get streaming responses with markdown rendering and code copy buttons. |
 | **🔑 Google sign-in** | Sign in once via your **real browser** (Edge/Chrome) — no embedded-browser blocks. The app imports your session securely. Chats stream via the official API. |
 | **⏹ Stop button** | Cancel a response mid-stream and keep the partial answer. |
-| **🎤 Voice typing** | Built-in speech-to-text via the Web Speech API. |
+| **🎤 Voice typing** | Click the mic — Windows' own voice typing (Win+H) types straight into the prompt. Works with any language you've configured in Windows, no extra setup. |
 | **📋 Code copy** | Every code block in answers has a **Copy** button. |
 | **🔀 Model switcher** | Switch between **gemini-3.6-flash** and **gemini-3.5-flash-lite** from the palette footer. |
 | **🎨 Dark / Light / Auto themes** | Solid, professional design. No cheap transparency. Select in Settings. |
@@ -100,7 +100,7 @@ No manual API key setup — sign in with Google once via your real browser and y
 
 ### Install (release build)
 
-1. Grab **`Gemini-Desktop-Companion-Setup-3.6.0.exe`** from the [latest release](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases).
+1. Grab **`Gemini-Desktop-Companion-Setup-3.6.1.exe`** from the [latest release](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases).
 2. Run the installer (per-user; desktop + Start Menu shortcuts included).
 3. Launch — the **Home window opens** and walks you through everything: features, shortcuts, and connecting Gemini.
 4. Sign in with Google via your real browser (takes 30 seconds) — the app picks up your session automatically.
@@ -191,11 +191,10 @@ After that: prompts stream in real time, screenshots are attached natively (`inl
 ## 🧠 How It Works
 
 **Circle to Search**
-1. Hotkey → `desktopCapturer` grabs every display at native (physical) resolution.
-2. Each display gets a selection overlay painting its frozen frame, dimmed.
-3. You drag a rectangle; the renderer crops the screenshot on a canvas at full resolution (DPR-corrected).
-4. The crop is analyzed by **Gemini vision** (official API) with **Google Search grounding** — the answer includes real web sources rendered as clickable links.
-5. "Open in Google Lens" uploads the crop via a **browser-native multipart form POST** from your real browser (Edge/Chrome), so full Lens results open in a standalone popup window.
+1. Hotkey → selection overlays appear **instantly** (<100ms) with a dim + "Capturing screen…" hint; the frozen frame is pushed in the moment `desktopCapturer` finishes (~1s).
+2. You drag a rectangle; the renderer crops the screenshot on a canvas at full resolution (DPR-corrected).
+3. The crop is analyzed by **Gemini vision** (official API) with **Google Search grounding** — the answer includes real web sources rendered as clickable links.
+4. "Open in Google Lens" uploads the crop via a **browser-native multipart form POST** from your real browser (Edge/Chrome), so full Lens results open in a standalone popup window.
 
 **Hold to Gemini**
 1. Hotkey → a solid 720×480 palette window opens.
@@ -238,7 +237,7 @@ Expected for unsigned NSIS builds. Verify with the checksums in the release note
 
 ## 🗺 Roadmap
 
-- [ ] Voice input (speech-to-text for prompts)
+- [x] Voice input (Windows voice typing via the mic button)
 - [ ] Free-form lasso selection
 - [ ] Local answer history with full-text search
 - [ ] Multi-model support (Claude, GPT, etc.)

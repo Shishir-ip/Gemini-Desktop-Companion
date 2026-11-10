@@ -25,6 +25,7 @@ export const IPC = {
   GeminiMinimize: 'gemini:minimize',
   GeminiPip: 'gemini:pip',
   GeminiStop: 'gemini:stop',
+  GeminiDictate: 'gemini:dictate', // mic button → Windows voice typing (Win+H)
   WidgetShown: 'widget:shown',
   WidgetResize: 'widget:resize',
   ThemeChanged: 'theme:changed',
