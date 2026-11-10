@@ -69,7 +69,7 @@ if (!app.requestSingleInstanceLock()) {
       const page = openArg.split('=')[1] ?? 'home'
       log(`[debug] --gdc-open=${page}`)
       setTimeout(() => {
-        if (page === 'circle') void startCircleToSearch('lens')
+        if (page === 'circle') void startCircleToSearch('lens', { force: true })
         else if (page === 'widget') showGeminiWidget()
         else if (page === 'settings') openSettings()
         else openHome()

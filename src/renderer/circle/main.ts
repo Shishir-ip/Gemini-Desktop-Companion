@@ -37,6 +37,9 @@ function enterWaiting(m: CircleMode): void {
   lensMode = false
   document.body.classList.remove('lens-mode')
   resetSelection()
+  // A reused overlay still holds the PREVIOUS session's frozen frame — it
+  // must not linger while the new capture runs.
+  img.removeAttribute('src')
   hintText.textContent = 'Capturing screen…'
   attachHint.hidden = true
   document.body.classList.add('ready')

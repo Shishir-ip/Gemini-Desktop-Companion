@@ -17,6 +17,12 @@ const readyWindows = new Set<BrowserWindow>()
 let captures: Map<number, DisplayCapture> = new Map()
 let mode: CircleMode = 'lens'
 let lensModeActive = false
+/** A startCircleToSearch is in flight (capture pending). */
+let sessionStarting = false
+/** Overlays are up (selection pending, frozen, or results open). */
+let sessionActive = false
+/** Monotonic session id — stale async captures must never touch a newer session. */
+let sessionGen = 0
 
 const READY_WATCHDOG_MS = 7000
 
@@ -38,7 +44,35 @@ export function markOverlayReady(sender: Electron.WebContents): void {
 }
 
 /** Freeze every display behind a full-screen selection overlay. */
-export async function startCircleToSearch(m: CircleMode = 'lens'): Promise<void> {
+export async function startCircleToSearch(
+  m: CircleMode = 'lens',
+  opts: { force?: boolean } = {}
+): Promise<void> {
+  // RE-TRIGGER GUARD: a held key auto-repeats and double-taps land twice —
+  // each re-fire used to run a fresh capture WHILE the previous overlay was
+  // on screen, so every frozen frame baked the previous dim in (dims
+  // compounded → near-black captures → "the subject is too dark").
+  // While a session is running, further hotkey presses are ignored.
+  if (sessionStarting || sessionActive) {
+    if (!opts.force) {
+      log('[circle] session already active — ignoring re-trigger')
+      return
+    }
+    // Explicit new intent (e.g. the palette's attach button) replaces the
+    // running session instead of being swallowed by it.
+    closeAllSearchUI()
+  }
+  sessionStarting = true
+  try {
+    await runCircleSession(m)
+    sessionActive = true
+  } finally {
+    sessionStarting = false
+  }
+}
+
+async function runCircleSession(m: CircleMode): Promise<void> {
+  const myGen = ++sessionGen
   mode = m
   lensModeActive = false
 
@@ -52,7 +86,8 @@ export async function startCircleToSearch(m: CircleMode = 'lens'): Promise<void>
   // desktopCapturer takes 300-1500ms — awaiting it before showing anything
   // was the "circle to search takes a while to open" bug. The renderer
   // paints a dim-only "Capturing screen…" state; frames are pushed through
-  // IPC.CircleSetImage the moment they exist.
+  // IPC.CircleSetImage the moment they exist. The overlays are excluded
+  // from capture (setContentProtection) so the frozen frames stay clean.
   captures = new Map() // stale frames from a previous session must not leak
   const capturePromise = captureAllDisplays().catch((err) => {
     log(`[circle] capture failed: ${String(err)}`)
@@ -76,6 +111,13 @@ export async function startCircleToSearch(m: CircleMode = 'lens'): Promise<void>
   log(`[circle] overlays shown instantly (mode: ${m}, displays: ${screen.getAllDisplays().length})`)
 
   const caps = await capturePromise
+  // A forced restart (attach button, tray) may have superseded this session
+  // while the capture was in flight — its frames are stale, and its failure
+  // paths must not close the NEW session's overlays either.
+  if (myGen !== sessionGen) {
+    log('[circle] capture finished after session was replaced — dropping stale frames')
+    return
+  }
   if (!caps || caps.size === 0) {
     // Nothing captured — overlays must NOT linger as invisible input blocks.
     log('[circle] no displays captured — closing overlays')
@@ -120,6 +162,12 @@ function createOverlay(display: Display, displayId: number): void {
     }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
+  // EXCLUDE FROM CAPTURE: without this, the desktopCapturer grab (which runs
+  // while the overlay is already on screen in the instant-open flow) sees the
+  // overlay's own dim — the frozen frame captured the selection UI itself and
+  // repeated triggers compounded the darkness. WDA_EXCLUDEFROMCAPTURE keeps
+  // the overlay visible to the user but invisible to every capture path.
+  win.setContentProtection(true)
   windowDisplay.set(win, displayId)
   overlays.set(displayId, win)
   // The frozen frame arrives via IPC.CircleSetImage once captured (or via
@@ -162,6 +210,10 @@ function createOverlay(display: Display, displayId: number): void {
     clearTimeout(watchdog)
     readyWindows.delete(win)
     overlays.delete(displayId)
+    // Safety net: if every overlay window dies without a closeAll call
+    // (crash path), the session must not stay latched — the hotkey would
+    // be dead forever.
+    if (overlays.size === 0) sessionActive = false
   })
 
   loadRendererPage(win, 'circle')
@@ -214,6 +266,7 @@ export function closeAllOverlays(): void {
     if (!win.isDestroyed()) win.hide()
   }
   lensModeActive = false
+  sessionActive = false // session over — the hotkey may start a new one
 }
 
 /** Esc / outside click — close panel + every overlay. */

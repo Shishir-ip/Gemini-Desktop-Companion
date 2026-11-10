@@ -16,7 +16,7 @@ export function createTray(): void {
   const menu = Menu.buildFromTemplate([
     { label: 'Home', click: () => openHome() },
     { label: 'Hold to Gemini', click: () => toggleGeminiWidget() },
-    { label: 'Circle to Search', click: () => void startCircleToSearch('lens') },
+    { label: 'Circle to Search', click: () => void startCircleToSearch('lens', { force: true }) },
     { type: 'separator' },
     { label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: () => openSettings() },
     { label: 'Check for Updates…', click: () => void checkForUpdates(true) },

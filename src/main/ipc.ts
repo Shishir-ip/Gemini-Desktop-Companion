@@ -97,7 +97,9 @@ export function registerIpc(): void {
   })
   ipcMain.handle(IPC.GeminiAttachFromScreen, () => {
     hideGeminiWidget()
-    void startCircleToSearch('attach')
+    // force: a deliberate attach click must replace a running search session
+    // (the plain hotkey is the one that gets repeat-fire-guarded).
+    void startCircleToSearch('attach', { force: true })
   })
   ipcMain.handle(IPC.GeminiRemoveAttachment, () => clearPendingAttachment())
   ipcMain.handle(IPC.GeminiNewChat, () => gemini.resetChat())
@@ -177,7 +179,7 @@ export function registerIpc(): void {
 
   // ── Generic window helpers ───────────────────────────────────────────
   ipcMain.handle(IPC.AppOpenExternal, (_event, url: string) => openExternalUrl(url))
-  ipcMain.handle(IPC.AppStartCircle, () => void startCircleToSearch('lens'))
+  ipcMain.handle(IPC.AppStartCircle, () => void startCircleToSearch('lens', { force: true }))
   ipcMain.handle(IPC.AppShowWidget, () => showGeminiWidget())
   ipcMain.handle(IPC.WindowMinimize, (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize()
