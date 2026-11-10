@@ -24,6 +24,10 @@ let startX = 0
 let startY = 0
 /** True once the frozen frame is painted — selection is gated on this. */
 let frozenReady = false
+// 1×1 transparent GIF. Setting this (not just removing src) guarantees the
+// <img> stops displaying the previous session's screenshot: Chromium keeps
+// showing the last decoded bitmap until a new load begins.
+const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
 
 init().catch((err) => {
   console.error('circle init failed', err)
@@ -37,9 +41,13 @@ function enterWaiting(m: CircleMode): void {
   lensMode = false
   document.body.classList.remove('lens-mode')
   resetSelection()
-  // A reused overlay still holds the PREVIOUS session's frozen frame — it
-  // must not linger while the new capture runs.
-  img.removeAttribute('src')
+  // A reused overlay still holds the PREVIOUS session's frozen frame — swap
+  // in a transparent pixel so nothing stale can render (removeAttribute alone
+  // leaves the last decoded bitmap on screen). Handlers are detached first:
+  // this instant load must never resolve a later applyCapture's wait.
+  img.onload = null
+  img.onerror = null
+  img.src = TRANSPARENT_PIXEL
   hintText.textContent = 'Capturing screen…'
   attachHint.hidden = true
   document.body.classList.add('ready')

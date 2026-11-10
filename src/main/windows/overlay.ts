@@ -158,7 +158,11 @@ function createOverlay(display: Display, displayId: number): void {
       preload: preloadPath('index'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      // The waiting-state repaint runs while the window is hidden (the
+      // dismiss-time frame clear) — background throttling would defer it and
+      // the stale frozen surface would resurface on the next show.
+      backgroundThrottling: false
     }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
@@ -263,7 +267,13 @@ export function isLensModeActive(): boolean {
 
 export function closeAllOverlays(): void {
   for (const win of overlays.values()) {
-    if (!win.isDestroyed()) win.hide()
+    if (win.isDestroyed()) continue
+    // Clear the frozen frame BEFORE hiding: Windows keeps presenting a
+    // hidden window's last rendered surface, so a warm reopen would flash
+    // the previous session's screenshot for the whole capture duration.
+    // The renderer swaps to dim-only while the window goes away.
+    win.webContents.send(IPC.CircleSetImage, { dataUrl: null, scaleFactor: 1, mode })
+    win.hide()
   }
   lensModeActive = false
   sessionActive = false // session over — the hotkey may start a new one
