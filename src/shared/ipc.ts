@@ -4,7 +4,8 @@ export const IPC = {
   CircleGetCapture: 'circle:get-capture',
   CircleSetImage: 'circle:set-image',
   CircleReady: 'circle:ready',
-  CircleSelected: 'circle:selected',
+  /** Renderer reports the selection rect; main crops the LOSSLESS original. */
+  CircleSelectRect: 'circle:select-rect',
   CircleCancel: 'circle:cancel',
   CircleDismissAll: 'circle:dismiss-all',
   CircleSetLensMode: 'circle:set-lens-mode',
@@ -12,6 +13,9 @@ export const IPC = {
   // ── Lens panel ──────────────────────────────────────────────────────────
   LensRetry: 'lens:retry',
   LensOpenWeb: 'lens:open-web',
+  LensCopyImage: 'lens:copy-image',
+  LensSaveImage: 'lens:save-image',
+  LensAskGemini: 'lens:ask-gemini',
   ResultsGetCrop: 'results:get-crop',
   ResultsAnalyze: 'results:analyze',
 
@@ -48,6 +52,8 @@ export const IPC = {
   SettingsCheckUpdates: 'settings:check-updates',
   SettingsSetTheme: 'settings:set-theme',
   SettingsSetOrbSide: 'settings:set-orb-side',
+  SettingsSetPrefs: 'settings:set-prefs',
+  PrefsChanged: 'prefs:changed', // main → UIs
   OrbSideChanged: 'orb-side:changed',
   ApiChanged: 'api:changed', // main → UIs
 

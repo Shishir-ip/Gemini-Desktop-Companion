@@ -10,12 +10,14 @@ import { initTheme } from '../shared/theme'
 initTheme()
 
 /**
- * Floating Gemini command palette — chat-bubble UI (user prompts right,
- * answers left, copy per answer), powered by the official Gemini API.
+ * Android-style Gemini pill: a bottom-anchored capsule (+ / input / model
+ * chips / send) that grows a scrollable chat sheet above it once a
+ * conversation exists. Quick actions appear on an empty chat and right
+ * after a screen capture is attached.
  */
 
-const wrap = document.getElementById('wrap') as HTMLDivElement
-const responseCard = document.getElementById('response-card') as HTMLElement
+const stack = document.getElementById('stack') as HTMLDivElement
+const chatSheet = document.getElementById('chat-sheet') as HTMLElement
 const messages = document.getElementById('messages') as HTMLDivElement
 const thinking = document.getElementById('thinking') as HTMLElement
 const thinkingDetail = document.getElementById('thinking-detail') as HTMLElement
@@ -24,7 +26,6 @@ const errorTitle = document.getElementById('error-title') as HTMLElement
 const errorMessage = document.getElementById('error-message') as HTMLElement
 const errorRetry = document.getElementById('error-retry') as HTMLButtonElement
 const errorSignin = document.getElementById('error-signin') as HTMLButtonElement
-const responseFooter = document.getElementById('response-footer') as HTMLElement
 const newChatBtn = document.getElementById('btn-newchat') as HTMLButtonElement
 const streamCursor = document.getElementById('stream-cursor') as HTMLElement
 const apiDot = document.getElementById('api-dot') as HTMLElement
@@ -35,6 +36,7 @@ const keyStatus = document.getElementById('api-key-status') as HTMLElement
 const chip38 = document.getElementById('chip-38') as HTMLButtonElement
 const chip35 = document.getElementById('chip-35') as HTMLButtonElement
 const getKeyBtn = document.getElementById('btn-getkey') as HTMLButtonElement
+const quickActions = document.getElementById('quick-actions') as HTMLDivElement
 const attachmentChip = document.getElementById('attachment-chip') as HTMLElement
 const attachmentThumb = document.getElementById('attachment-thumb') as HTMLImageElement
 const attachmentSize = document.getElementById('attachment-size') as HTMLElement
@@ -44,16 +46,14 @@ const sendBtn = document.getElementById('btn-send') as HTMLButtonElement
 const attachBtn = document.getElementById('btn-attach') as HTMLButtonElement
 const closeBtn = document.getElementById('btn-close') as HTMLButtonElement
 const minimizeBtn = document.getElementById('btn-minimize') as HTMLButtonElement
-const micBtn = document.getElementById('btn-mic') as HTMLButtonElement
 const settingsBtn = document.getElementById('btn-settings') as HTMLButtonElement
 
 let attachment: Attachment | null = null
 let api: ApiState = { hasKey: false, valid: false, model: '' }
 let lastPrompt = ''
-let lastError: GeminiErrorPayload | null = null
-// Active model bubble being streamed into (null until the first chunk).
+let hasChat = false
 let activeBubble: { body: HTMLDivElement; setText: (html: string) => void } | null = null
-let lastCopyOk = false
+let activeBubbleRaw = ''
 let isBusy = false
 const sendArrow = sendBtn.innerHTML
 const stopIcon =
@@ -63,9 +63,12 @@ function setBusy(busy: boolean): void {
   isBusy = busy
   sendBtn.title = busy ? 'Stop generating' : 'Send (Enter)'
   sendBtn.innerHTML = busy ? stopIcon : sendArrow
-  sendBtn.disabled = busy
-    ? false
-    : prompt.value.trim().length === 0 && !attachment
+  sendBtn.disabled = busy ? false : prompt.value.trim().length === 0 && !attachment
+}
+
+/** Quick actions: empty chat, or a capture was just attached. */
+function updateQuickActions(): void {
+  quickActions.hidden = hasChat && !attachment
 }
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
@@ -79,10 +82,7 @@ window.addEventListener('focus', () => {
 })
 window.gdc.gemini.onShown(() => {
   prompt.focus()
-  // CRITICAL: if the palette was closed mid-answer, the request was
-  // cancelled without a done/error event — isBusy stayed true and every
-  // later submit was swallowed as a "stop" (the "stops responding" bug).
-  // Reopening resets the busy state so questions work again.
+  // Reopening after a mid-answer close must reset the busy latch.
   setBusy(false)
   hideThinking()
   streamCursor.hidden = true
@@ -115,18 +115,16 @@ function renderChatLog(log: Array<{ role: 'user' | 'model'; text: string; image?
     } else {
       appendModelBubble()
       activeBubbleRaw = entry.text
-      ;(activeBubble as { setText: (html: string) => void } | null)?.setText(renderMarkdown(activeBubbleRaw))
-      activeBubble = null // finalized — no streaming cursor
+      const bubble = activeBubble as { setText: (html: string) => void } | null
+      bubble?.setText(renderMarkdown(activeBubbleRaw))
+      finalizeModelBubble()
       decorateCodeBlocks()
     }
   }
-  if (log.length > 0) {
-    responseCard.hidden = false
-    responseFooter.hidden = false
-    scrollMessages()
-  } else {
-    responseCard.hidden = true
-  }
+  hasChat = log.length > 0
+  chatSheet.hidden = !hasChat
+  updateQuickActions()
+  if (hasChat) scrollMessages()
 }
 
 /* ── State rendering ───────────────────────────────────────────────────── */
@@ -134,12 +132,14 @@ function setAttachment(next: Attachment | null): void {
   attachment = next
   if (!attachment) {
     attachmentChip.hidden = true
+    updateQuickActions()
     return
   }
   attachmentThumb.src = attachment.dataUrl
   const bytes = Math.round((attachment.dataUrl.length * 3) / 4 / 1024)
   attachmentSize.textContent = `PNG · ~${bytes} KB`
   attachmentChip.hidden = false
+  updateQuickActions()
 }
 
 function setApiState(state: ApiState): void {
@@ -150,13 +150,11 @@ function setApiState(state: ApiState): void {
     : 'Gemini not connected — paste a free API key'
   apiBanner.hidden = state.hasKey
   prompt.disabled = !state.hasKey
-  // The mic only makes sense once chat is usable — show it when connected.
-  micBtn.hidden = !state.hasKey
   if (!state.hasKey) {
-    prompt.placeholder = 'Connect Gemini to start asking…'
+    prompt.placeholder = 'Connect Gemini to start asking'
     sendBtn.disabled = true
   } else {
-    prompt.placeholder = 'Ask Gemini anything…'
+    prompt.placeholder = 'Ask Gemini'
     autoSize()
   }
   chip38.classList.toggle('active', state.model === 'gemini-3.6-flash')
@@ -167,10 +165,7 @@ chip38.addEventListener('click', () => void switchModel('gemini-3.6-flash'))
 chip35.addEventListener('click', () => void switchModel('gemini-3.5-flash-lite'))
 
 async function switchModel(model: string): Promise<void> {
-  const res = (await window.gdc.models.setModel(model)) as {
-    ok: boolean
-    state: ApiState
-  }
+  const res = (await window.gdc.models.setModel(model)) as { ok: boolean; state: ApiState }
   if (res.ok) setApiState(res.state)
 }
 
@@ -185,8 +180,6 @@ function appendUserBubble(text: string, image?: string): void {
   const bubble = document.createElement('div')
   bubble.className = 'bubble'
   if (image) {
-    // Sent screenshots stay visible in the conversation (both live and on
-    // re-render from the chat log) instead of vanishing after the next prompt.
     const img = document.createElement('img')
     img.className = 'shot-thumb'
     img.src = image
@@ -197,7 +190,9 @@ function appendUserBubble(text: string, image?: string): void {
   if (text) bubble.appendChild(document.createTextNode(text))
   msg.appendChild(bubble)
   messages.appendChild(msg)
-  responseCard.hidden = false
+  hasChat = true
+  chatSheet.hidden = false
+  updateQuickActions()
   scrollMessages()
 }
 
@@ -209,7 +204,7 @@ function appendModelBubble(): void {
   bubble.textContent = ''
   msg.appendChild(bubble)
   messages.appendChild(msg)
-  responseCard.hidden = false
+  chatSheet.hidden = false
   scrollMessages()
   activeBubble = {
     body: bubble,
@@ -219,48 +214,27 @@ function appendModelBubble(): void {
   }
 }
 
-let activeBubbleRaw = ''
-
-/* ── Voice typing (Windows dictation via Win+H) ────────────────────────── */
-// Chromium's SpeechRecognition is a dead end inside Electron (no Google
-// speech key — always fails with 'network'). The mic button instead focuses
-// the prompt and fires Win+H: Windows' own voice typing then types spoken
-// words straight into the focused textarea, like a real keyboard. Win+H is
-// a TOGGLE — clicking the mic again stops dictation.
-let micActive = false
-let micGlowTimer: ReturnType<typeof setTimeout> | null = null
-
-function setMicGlow(on: boolean): void {
-  micActive = on
-  micBtn.classList.toggle('mic-active', on)
-  if (micGlowTimer) {
-    clearTimeout(micGlowTimer)
-    micGlowTimer = null
-  }
-  if (on) {
-    // The glow fades when the OS dictation toolbar closes on its own
-    // (silence, Esc, or clicking away) — we can't observe that directly.
-    micGlowTimer = setTimeout(() => setMicGlow(false), 30_000)
-  } else {
-    micBtn.title = 'Voice typing'
-  }
-}
-
-micBtn.addEventListener('click', () => {
-  const stopping = micActive
-  setMicGlow(!stopping)
-  if (stopping) micBtn.title = 'Voice typing'
-  // Dictation anchors to the keyboard-focused field.
-  prompt.focus()
-  void window.gdc.gemini.dictate().then((res) => {
-    if (!res?.ok) {
-      setMicGlow(false)
-      micBtn.title = res?.error ?? 'Voice typing failed to start'
-    } else if (!stopping) {
-      micBtn.title = 'Listening — click again to stop (or press Esc)'
-    }
+/** Attach the hover copy tool to a finished model answer. */
+function finalizeModelBubble(): void {
+  if (!activeBubble) return
+  const msg = activeBubble.body.parentElement
+  activeBubble = null
+  if (!msg || msg.querySelector('.bubble-tools')) return
+  const tools = document.createElement('div')
+  tools.className = 'bubble-tools'
+  const copy = document.createElement('button')
+  copy.className = 'bubble-copy'
+  copy.textContent = 'Copy'
+  copy.addEventListener('click', () => {
+    const text = (msg.querySelector('.bubble') as HTMLElement | null)?.innerText ?? ''
+    void navigator.clipboard.writeText(text).then(() => {
+      copy.textContent = '✓ Copied'
+      setTimeout(() => (copy.textContent = 'Copy'), 1500)
+    })
   })
-})
+  tools.appendChild(copy)
+  msg.appendChild(tools)
+}
 
 /* ── Events from main ──────────────────────────────────────────────────── */
 window.gdc.gemini.onAttachment((payload) => setAttachment(payload as Attachment | null))
@@ -281,7 +255,6 @@ window.gdc.gemini.onChunk((payload) => {
   if ((p as { target?: string }).target !== 'widget') return
   hideThinking()
   hideError()
-  responseFooter.hidden = true
   if (!activeBubble) appendModelBubble()
   activeBubbleRaw = p.full
   activeBubble?.setText(renderMarkdown(activeBubbleRaw))
@@ -293,17 +266,17 @@ window.gdc.gemini.onDone((payload) => {
   setBusy(false)
   streamCursor.hidden = true
   hideThinking()
-  responseFooter.hidden = false
+  finalizeModelBubble()
+  decorateCodeBlocks()
 })
 window.gdc.gemini.onError((payload) => {
   const p = payload as GeminiErrorPayload
   if ((p as { target?: string }).target !== 'widget') return
-  lastError = p
   setBusy(false)
   hideThinking()
   streamCursor.hidden = true
   errorBox.hidden = false
-  responseFooter.hidden = false
+  chatSheet.hidden = false
   errorTitle.textContent = p.code === 'NO_API_KEY' ? 'Gemini is not connected' : 'Something went wrong'
   errorMessage.textContent = p.message
   errorSignin.hidden = !p.needsKey
@@ -312,12 +285,10 @@ window.gdc.gemini.onError((payload) => {
 /* ── Actions ───────────────────────────────────────────────────────────── */
 sendBtn.addEventListener('click', () => {
   if (isBusy) {
-    // Stop generating: cancel the request, keep the partial answer.
     void window.gdc.gemini.stop()
     setBusy(false)
     hideThinking()
     streamCursor.hidden = true
-    responseFooter.hidden = false
     return
   }
   submit()
@@ -333,21 +304,20 @@ prompt.addEventListener('input', autoSize)
 attachBtn.addEventListener('click', () => void window.gdc.gemini.attachFromScreen())
 removeAttachmentBtn.addEventListener('click', () => void window.gdc.gemini.removeAttachment())
 closeBtn.addEventListener('click', () => {
-  // X = close the chat: hide the window AND discard the conversation.
   document.body.classList.add('closing')
   setTimeout(() => void window.gdc.gemini.close(), 150)
 })
 minimizeBtn.addEventListener('click', () => {
-  // Minimize to the Windows taskbar — chat + context persist.
   void window.gdc.gemini.minimize()
 })
 settingsBtn.addEventListener('click', () => void window.gdc.settings.open())
 newChatBtn.addEventListener('click', () => {
   messages.innerHTML = ''
-  responseCard.hidden = true
-  responseFooter.hidden = true
+  chatSheet.hidden = true
+  hasChat = false
   activeBubble = null
   activeBubbleRaw = ''
+  updateQuickActions()
   void window.gdc.gemini.newChat()
   prompt.focus()
 })
@@ -410,18 +380,39 @@ async function saveKey(): Promise<void> {
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     e.preventDefault()
-    minimizeToTaskbar()
+    void window.gdc.gemini.minimize()
   }
 })
 
+/* ── Quick actions ─────────────────────────────────────────────────────── */
+const QA_TEMPLATES: Record<string, { withImage: string; textPrefix: string }> = {
+  explain: { withImage: 'Explain this screenshot in detail.', textPrefix: 'Explain this simply: ' },
+  summarize: { withImage: 'Summarize the key points of this screenshot.', textPrefix: 'Summarize this: ' },
+  translate: { withImage: 'Translate the text in this screenshot into English.', textPrefix: 'Translate into English: ' },
+  solve: { withImage: 'Solve the problem in this screenshot, step by step.', textPrefix: 'Solve step by step: ' },
+  code: { withImage: 'Write code based on this screenshot.', textPrefix: 'Write code for: ' }
+}
+quickActions.querySelectorAll('.qa-chip').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    const qa = QA_TEMPLATES[(chip as HTMLElement).dataset.qa ?? '']
+    if (!qa) return
+    if (attachment) {
+      void submit(qa.withImage)
+    } else {
+      prompt.value = qa.textPrefix
+      autoSize()
+      prompt.focus()
+    }
+  })
+})
 
+/* ── Submit ────────────────────────────────────────────────────────────── */
 async function submit(forceText?: string, isRetry = false): Promise<void> {
   if (isBusy) {
     void window.gdc.gemini.stop()
     setBusy(false)
     hideThinking()
     streamCursor.hidden = true
-    responseFooter.hidden = false
     return
   }
   if (!api.hasKey) {
@@ -431,7 +422,6 @@ async function submit(forceText?: string, isRetry = false): Promise<void> {
   const text = (forceText ?? prompt.value).trim()
   if (!text && !attachment && !isRetry) return
   lastPrompt = text || lastPrompt
-  // The user prompt becomes a bubble; the answer streams below it.
   appendUserBubble(text || '(screenshot)', attachment?.dataUrl)
   prompt.value = ''
   autoSize()
@@ -454,38 +444,27 @@ function showThinking(detail: string): void {
   thinkingDetail.textContent = detail
   thinking.hidden = false
   streamCursor.hidden = true
-  responseFooter.hidden = true
   errorBox.hidden = true
-  responseCard.hidden = false
+  chatSheet.hidden = false
   scrollMessages()
 }
 function hideThinking(): void {
   thinking.hidden = true
 }
 function showError(code: string, message: string): void {
-  lastError = { code, message, needsKey: code === 'NO_API_KEY' }
   errorBox.hidden = false
+  chatSheet.hidden = false
   errorTitle.textContent = code === 'NO_API_KEY' ? 'Gemini is not connected' : 'Something went wrong'
   errorMessage.textContent = message
-  errorSignin.hidden = !lastError.needsKey
-  responseCard.hidden = false
+  errorSignin.hidden = code !== 'NO_API_KEY'
 }
 function hideError(): void {
   errorBox.hidden = true
 }
 
-function close(): void {
-  document.body.classList.add('closing')
-  setTimeout(() => void window.gdc.gemini.close(), 150)
-}
-
-function minimizeToTaskbar(): void {
-  void window.gdc.gemini.minimize()
-}
-
 function autoSize(): void {
   prompt.style.height = 'auto'
-  prompt.style.height = `${Math.min(prompt.scrollHeight, 130)}px`
+  prompt.style.height = `${Math.min(prompt.scrollHeight, 76)}px`
   sendBtn.disabled = prompt.value.trim().length === 0 && !attachment
 }
 sendBtn.disabled = true
@@ -501,7 +480,6 @@ function escapeHtml(src: string): string {
 
 function renderMarkdown(src: string): string {
   let text = escapeHtml(src)
-
   text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_m, _lang, code) => {
     return `<pre class="code"><code>${String(code).replace(/\n+$/, '')}</code></pre>`
   })
@@ -509,10 +487,7 @@ function renderMarkdown(src: string): string {
   text = text.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
   text = text.replace(/(^|[\s(])\*([^*\n]+)\*(?=$|[\s.,;:!?)])/g, '$1<em>$2</em>')
   text = text.replace(/^#{1,4}\s+(.+)$/gm, '<h3>$1</h3>')
-  text = text.replace(
-    /\[([^\]]+)\]\((https?:[^)\s]+)\)/g,
-    '<a data-href="$2">$1</a>'
-  )
+  text = text.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a data-href="$2">$1</a>')
   text = text.replace(
     /(?:^|\n)((?:[-*•]\s+[^\n]+\n?)+)/g,
     (_m, block: string) =>
@@ -540,7 +515,7 @@ function renderMarkdown(src: string): string {
   return text
 }
 
-/* ── Code copy: add copy buttons to code blocks after render ──────────── */
+/* ── Code copy buttons ─────────────────────────────────────────────────── */
 function decorateCodeBlocks(): void {
   messages.querySelectorAll('pre.code').forEach((el) => {
     const pre = el as HTMLElement
@@ -560,20 +535,6 @@ function decorateCodeBlocks(): void {
   })
 }
 
-// Delegated handler — works for dynamically rendered code blocks.
-messages.addEventListener('click', (e) => {
-  const btn = (e.target as HTMLElement).closest('.code-copy')
-  if (!btn) return
-  const pre = btn.closest('pre.code')
-  if (!pre) return
-  const code = pre.querySelector('code')?.textContent ?? pre.textContent ?? ''
-  void navigator.clipboard.writeText(code).then(() => {
-    btn.textContent = '✓ Copied'
-    setTimeout(() => (btn.textContent = 'Copy'), 1600)
-  })
-})
-
-// Links open in the user's real browser.
 messages.addEventListener('click', (e) => {
   const target = e.target as HTMLElement
   const anchor = target.closest('a[data-href]')
@@ -583,12 +544,22 @@ messages.addEventListener('click', (e) => {
   }
 })
 
-/* ── Pop-in animation on every show ────────────────────────────────────── */
+/* ── Self-sizing window: the pill grows upward into a chat ─────────────── */
+let lastSentHeight = 0
+const reportHeight = (): void => {
+  const h = Math.ceil(stack.offsetHeight + 24) // + wrap padding
+  if (Math.abs(h - lastSentHeight) >= 2) {
+    lastSentHeight = h
+    window.gdc.widget.resize(h)
+  }
+}
+new ResizeObserver(reportHeight).observe(stack)
+reportHeight()
+
+/* ── Pop-in on every show ──────────────────────────────────────────────── */
 window.gdc.gemini.onShown(() => {
-  const wrap = document.getElementById('wrap')
-  if (!wrap) return
-  wrap.classList.remove('shown')
-  void (wrap as HTMLElement).offsetWidth // force reflow to replay animation
-  wrap.classList.add('shown')
+  document.body.classList.remove('shown', 'closing')
+  void document.body.offsetWidth
+  document.body.classList.add('shown')
 })
 document.body.classList.add('shown')

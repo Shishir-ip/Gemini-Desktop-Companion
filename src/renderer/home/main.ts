@@ -51,7 +51,8 @@ function applyApi(state: ApiState): void {
     keyRow.hidden = true
     keyStatus.hidden = true
     btnSignin.textContent = 'Manage key'
-    btnSignin.onclick = () => void window.gdc.settings.openApiKeys()
+    // Key changes/removal live in Settings — not on the Home surface.
+    btnSignin.onclick = () => void window.gdc.settings.open()
   } else {
     accountTitle.textContent = 'Connect Gemini — one free key, 30 seconds'
     accountSub.textContent = '1. Click "Get API key" · 2. Create it in your browser · 3. Paste it here.'

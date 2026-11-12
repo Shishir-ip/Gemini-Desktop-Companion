@@ -11,25 +11,25 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <div id="panel" class="glass-card anim-fade-up">
+    <div id="panel" class="glass-card">
       <!-- Custom title bar -->
       <header id="titlebar">
         <div class="tb-title">
           <img src="/icon.png" alt="" class="tb-logo" draggable="false" />
-          <span>Gemini Desktop Companion</span>
+          <span>Settings</span>
           <span id="version-badge" class="version-badge">v1.0.0</span>
         </div>
         <div class="tb-actions">
           <button id="btn-minimize" class="tb-btn" title="Minimize">
-            <svg width="12" height="12" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"><path d="M5 12h14"/></svg>
           </button>
           <button id="btn-close" class="tb-btn tb-close" title="Close">
-            <svg width="12" height="12" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"><path d="M18 6 6 18M6 6l12 12"/></svg>
           </button>
         </div>
       </header>
 
-      <main id="content">
+      <main id="content" class="stagger">
         <!-- Shortcuts -->
         <section>
           <h2 class="section-title">Shortcuts</h2>
@@ -63,6 +63,56 @@
             </div>
           </div>
           <p id="hotkey-note" class="note" hidden></p>
+        </section>
+
+        <!-- Selection & Capture -->
+        <section>
+          <h2 class="section-title">Selection &amp; Capture</h2>
+          <div class="group">
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Screen-edge glow</span>
+                <span class="row-sub">Apple-Intelligence-style rim light when Circle to Search wakes</span>
+              </div>
+              <div id="pref-glow" class="ios-toggle" role="switch" aria-checked="true" tabindex="0"></div>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Glow intensity</span>
+                <span class="row-sub">How bright the rim blooms</span>
+              </div>
+              <div class="segmented" id="glow-intensity">
+                <button class="seg-btn" data-glow="subtle">Subtle</button>
+                <button class="seg-btn" data-glow="balanced">Balanced</button>
+                <button class="seg-btn" data-glow="vivid">Vivid</button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Focus dim</span>
+                <span class="row-sub">Darkening outside the selection while you drag</span>
+              </div>
+              <div class="segmented" id="selection-dim">
+                <button class="seg-btn" data-dim="none">None</button>
+                <button class="seg-btn" data-dim="light">Light</button>
+                <button class="seg-btn" data-dim="classic">Classic</button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Copy crops to clipboard</span>
+                <span class="row-sub">Every selection is also ready to paste anywhere</span>
+              </div>
+              <div id="pref-copy" class="ios-toggle" role="switch" aria-checked="false" tabindex="0"></div>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-title">Auto-save captures</span>
+                <span class="row-sub">Save every crop as PNG into Pictures/Gemini Captures</span>
+              </div>
+              <div id="pref-save" class="ios-toggle" role="switch" aria-checked="false" tabindex="0"></div>
+            </div>
+          </div>
         </section>
 
         <!-- General -->
@@ -107,6 +157,7 @@
               <div class="btn-stack">
                 <button id="btn-login" class="glass-btn glass-btn-primary">Get API key</button>
                 <button id="btn-change-key" class="glass-btn" hidden>Change key</button>
+                <button id="btn-remove-key" class="glass-btn" hidden>Remove key</button>
               </div>
             </div>
             <div class="row">

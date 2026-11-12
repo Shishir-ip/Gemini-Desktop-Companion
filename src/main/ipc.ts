@@ -1,26 +1,26 @@
-import { BrowserWindow, app, ipcMain, nativeTheme, shell } from 'electron'
+import { BrowserWindow, app, clipboard, dialog, ipcMain, nativeImage, nativeTheme, shell } from 'electron'
+import { writeFileSync } from 'node:fs'
+import path from 'node:path'
 import { IPC } from '../shared/ipc'
-import type { Hotkeys, SetHotkeysResponse } from '../shared/types'
-import { store, getSettings } from './store'
+import type { CapturePrefs, Hotkeys, SetHotkeysResponse } from '../shared/types'
+import { store, getSettings, getPrefs, setPrefs } from './store'
 import { registerAllHotkeys, registrationStatus } from './shortcuts'
 import { applyLaunchAtStartup, isLaunchAtStartup } from './startup'
 import { checkForUpdates } from './updater'
 import { openExternalUrl } from './ipcUtils'
-import { clearPendingAttachment, getPendingAttachment } from './attachment'
+import { clearPendingAttachment, getPendingAttachment, setPendingAttachment } from './attachment'
 import { getGeminiSession } from './gemini/session'
 import {
   closeAllSearchUI,
   isLensModeActive,
   registerOverlayIpc,
   getCircleMode,
-  startCircleToSearch,
-  markOverlayReady
+  startCircleToSearch
 } from './windows/overlay'
 import {
   bindPanelIpc,
   retryLensInPanel,
   getLastCrop,
-  closePanel,
   getPanelWindow
 } from './windows/resultsPanel'
 import {
@@ -59,9 +59,48 @@ export function registerIpc(): void {
   bindPanelIpc()
   ipcMain.handle(IPC.WindowClose, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
-    // The results panel is a transient surface: close destroys it.
-    if (win && getPanelWindow() === win) closePanel(true)
+    // The results panel is a transient surface: closing it dismisses the
+    // whole Circle-to-Search experience (panel + frozen overlays).
+    if (win && getPanelWindow() === win) closeAllSearchUI()
     else win?.close()
+  })
+  ipcMain.handle(IPC.LensCopyImage, () => {
+    const crop = getLastCrop()
+    if (!crop) return { ok: false }
+    try {
+      clipboard.writeImage(nativeImage.createFromDataURL(crop))
+      return { ok: true }
+    } catch (err) {
+      log(`[lens] copy failed: ${String(err)}`)
+      return { ok: false }
+    }
+  })
+  ipcMain.handle(IPC.LensSaveImage, async () => {
+    const crop = getLastCrop()
+    if (!crop) return { ok: false }
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const opts = {
+      title: 'Save capture',
+      defaultPath: path.join(app.getPath('pictures'), `Gemini Capture ${stamp}.png`),
+      filters: [{ name: 'PNG image', extensions: ['png'] }]
+    }
+    const parent = getPanelWindow()
+    const res = parent ? await dialog.showSaveDialog(parent, opts) : await dialog.showSaveDialog(opts)
+    if (res.canceled || !res.filePath) return { ok: false }
+    try {
+      writeFileSync(res.filePath, Buffer.from(crop.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
+      return { ok: true, path: res.filePath }
+    } catch (err) {
+      log(`[lens] save failed: ${String(err)}`)
+      return { ok: false }
+    }
+  })
+  ipcMain.handle(IPC.LensAskGemini, () => {
+    const crop = getLastCrop()
+    if (!crop) return
+    setPendingAttachment({ dataUrl: crop, source: 'selection', createdAt: Date.now() })
+    closeAllSearchUI()
+    showGeminiWidget()
   })
   ipcMain.handle('gemini:set-model', (_event, model: string) => {
     const error = gemini.setModel(String(model))
@@ -126,8 +165,16 @@ export function registerIpc(): void {
     startup: isLaunchAtStartup(),
     api: gemini.getState(),
     theme: store.get('theme'),
+    prefs: getPrefs(),
     isDev: !app.isPackaged
   }))
+  ipcMain.handle(IPC.SettingsSetPrefs, (_event, patch: Partial<CapturePrefs>) => {
+    const next = setPrefs(patch && typeof patch === 'object' ? patch : {})
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send(IPC.PrefsChanged, next)
+    }
+    return next
+  })
   ipcMain.handle(
     IPC.SettingsSetHotkeys,
     (_event, hotkeys: Hotkeys): SetHotkeysResponse => {

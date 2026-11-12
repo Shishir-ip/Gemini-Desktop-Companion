@@ -1,9 +1,9 @@
 /**
  * Gemini Desktop Companion — procedural icon generator (zero dependencies).
  *
- * Draws the app icon (iOS-style rounded square with a diagonal blue→violet
- * gradient and a Gemini-style four-point sparkle) and encodes it straight to
- * PNG + multi-size ICO using Node's zlib. Also generates the tray sparkle.
+ * Premium monochrome mark: a graphite rounded square with a subtle vertical
+ * shade and a polished silver four-point sparkle. No rainbow gradients —
+ * the mark reads professional at every size, from 16px tray to 512px tile.
  *
  * Outputs:
  *   build/icon.ico                 (256/128/64/48/32/16)
@@ -47,8 +47,11 @@ function renderIcon(size) {
   const buf = Buffer.alloc(S * S * 4)
   const half = S / 2
   const radius = S * 0.225
-  const c1 = [91, 141, 255] // #5B8DFF
-  const c2 = [168, 85, 247] // #A855F7
+  // Graphite body: subtle vertical shade, top slightly lighter.
+  const top = [45, 46, 52] // #2D2E34
+  const bottom = [30, 31, 36] // #1E1F24
+  // Polished silver sparkle.
+  const silver = [232, 234, 240]
 
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
@@ -58,29 +61,23 @@ function renderIcon(size) {
       const cov = clamp01(0.5 - sd)
       if (cov <= 0) continue
 
-      // Diagonal gradient
-      const t = clamp01((px + py) / (2 * S))
-      let r = mix(c1[0], c2[0], t)
-      let g = mix(c1[1], c2[1], t)
-      let b = mix(c1[2], c2[2], t)
+      const t = clamp01(py / S)
+      let r = mix(top[0], bottom[0], t)
+      let g = mix(top[1], bottom[1], t)
+      let b = mix(top[2], bottom[2], t)
 
-      // Soft top-left highlight
-      const d = Math.hypot(px - S * 0.28, py - S * 0.22) / (S * 0.95)
-      const hl = clamp01(1 - d) * 0.22
-      r = mix(r, 255, hl)
-      g = mix(g, 255, hl)
-      b = mix(b, 255, hl)
-
-      // Gemini-style sparkles (big center + small top-right)
-      const big = starCoverage(px, py, half, half * 1.04, S * 0.30)
-      const small = starCoverage(px, py, S * 0.70, S * 0.30, S * 0.085)
+      // Sparkles: large centered mark + small companion, silver with a
+      // faint vertical polish so they read as machined metal, not flat white.
+      const big = starCoverage(px, py, half, half * 1.03, S * 0.3)
+      const small = starCoverage(px, py, S * 0.71, S * 0.29, S * 0.085)
       const star = Math.min(1, big + small)
-      r = mix(r, 255, star)
-      g = mix(g, 255, star)
-      b = mix(b, 255, star)
+      const polish = 1 - clamp01(py / S) * 0.14
+      r = mix(r, silver[0] * polish, star)
+      g = mix(g, silver[1] * polish, star)
+      b = mix(b, silver[2] * polish, star)
 
-      // Inner 1px light border (iOS glass rim)
-      const rim = clamp01(1 - Math.abs(sd + 1.8) / 1.6) * 0.30
+      // Hairline rim — a precise 1px machined edge.
+      const rim = clamp01(1 - Math.abs(sd + 1.6) / 1.4) * 0.22
       r = mix(r, 255, rim)
       g = mix(g, 255, rim)
       b = mix(b, 255, rim)
@@ -95,7 +92,7 @@ function renderIcon(size) {
   return downsample(buf, S, ss)
 }
 
-/** Render the tray sparkle (white-blue star, transparent background). */
+/** Render the tray sparkle (monochrome silver star, transparent bg). */
 function renderTray(size) {
   const ss = 4
   const S = size * ss
@@ -105,14 +102,13 @@ function renderTray(size) {
       const px = x + 0.5
       const py = y + 0.5
       const big = starCoverage(px, py, S / 2, S * 0.54, S * 0.36)
-      const small = starCoverage(px, py, S * 0.76, S * 0.22, S * 0.10)
+      const small = starCoverage(px, py, S * 0.76, S * 0.22, S * 0.1)
       const cov = Math.min(1, big + small)
       if (cov <= 0) continue
-      const t = clamp01(py / S)
       const i = (y * S + x) * 4
-      buf[i] = mix(240, 205, t)
-      buf[i + 1] = mix(244, 218, t)
-      buf[i + 2] = mix(255, 255, t)
+      buf[i] = 226
+      buf[i + 1] = 228
+      buf[i + 2] = 235
       buf[i + 3] = cov * 255
     }
   }

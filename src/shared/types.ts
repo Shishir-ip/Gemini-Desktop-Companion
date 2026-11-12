@@ -14,6 +14,39 @@ export interface AppSettings {
 
 export type CircleMode = 'lens' | 'attach'
 
+/** How hard the screen-edge glow blooms (Apple-Intelligence-style rim). */
+export type GlowIntensity = 'subtle' | 'balanced' | 'vivid'
+/** Dim applied OUTSIDE the selection rectangle while dragging. */
+export type SelectionDim = 'none' | 'light' | 'classic'
+
+/** Advanced capture/appearance preferences (Settings → Selection & Capture). */
+export interface CapturePrefs {
+  /** Screen-edge rim glow when Circle to Search wakes. */
+  glow: boolean
+  glowIntensity: GlowIntensity
+  selectionDim: SelectionDim
+  /** Also put every crop on the Windows clipboard. */
+  copyToClipboard: boolean
+  /** Auto-save every crop as PNG into Pictures/Gemini Captures. */
+  saveCaptures: boolean
+}
+
+export const DEFAULT_PREFS: CapturePrefs = {
+  glow: true,
+  glowIntensity: 'balanced',
+  selectionDim: 'light',
+  copyToClipboard: false,
+  saveCaptures: false
+}
+
+/** Selection rectangle in logical (CSS) pixels, relative to the display. */
+export interface SelectionRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 export interface Attachment {
   /** PNG data URL of the cropped region */
   dataUrl: string
@@ -22,9 +55,11 @@ export interface Attachment {
 }
 
 export interface CapturePayload {
-  dataUrl: string
+  /** Fast JPEG preview of the frozen display (the lossless original stays in main). */
+  dataUrl: string | null
   scaleFactor: number
   mode: CircleMode
+  prefs: CapturePrefs
 }
 
 export interface ApiState {
@@ -49,6 +84,7 @@ export interface SettingsAllResponse {
   api: ApiState
   theme: 'auto' | 'dark' | 'light'
   orbPosition: 'left' | 'right'
+  prefs: CapturePrefs
   isDev: boolean
 }
 

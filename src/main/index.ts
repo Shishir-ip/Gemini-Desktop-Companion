@@ -4,8 +4,9 @@ import { registerIpc } from './ipc'
 import { createTray, destroyTray, notifyTray } from './tray'
 import { registerAllHotkeys, registrationStatus } from './shortcuts'
 import { applyLaunchAtStartup } from './startup'
-import { startCircleToSearch } from './windows/overlay'
-import { showGeminiWidget } from './windows/geminiWidget'
+import { prewarmOverlays, startCircleToSearch } from './windows/overlay'
+import { prewarmGeminiWidget, showGeminiWidget } from './windows/geminiWidget'
+import { destroyGdiCapture, initGdiCapture } from './gdiCapture'
 import { openSettings } from './windows/settingsWindow'
 import { openHome } from './windows/homeWindow'
 import { store } from './store'
@@ -15,10 +16,10 @@ type QuittingProcess = NodeJS.Process & { gdcQuitting?: boolean }
 
 app.setName('Gemini Desktop Companion')
 
-// Transparent always-on-top overlay windows are the core of this app.
-// Software compositing is dramatically more reliable for them across GPU
-// drivers (blank/invisible window reports are always GPU-compositing bugs).
-app.disableHardwareAcceleration()
+// GPU compositing stays ON. Disabling it (software compositing) is a known
+// cause of BLACK transparent windows on Windows and made every overlay
+// repaint sluggish — the exact "blackish overlay + slow wake" reports.
+// Transparent always-on-top windows render correctly with the GPU path.
 
 // The app is a background tray daemon: launching a second instance simply
 // reveals the Home window in the first one.
@@ -48,6 +49,8 @@ if (!app.requestSingleInstanceLock()) {
     registerIpc()
     createTray()
     registerAllHotkeys()
+    // Start the fast-capture runspace ASAP (PowerShell startup is slow).
+    initGdiCapture()
     log(
       `hotkeys: circle=${registrationStatus.circleToSearch ? 'ok' : 'CONFLICT'}, ` +
         `gemini=${registrationStatus.holdToGemini ? 'ok' : 'CONFLICT'}, ` +
@@ -56,6 +59,14 @@ if (!app.requestSingleInstanceLock()) {
 
     // Keep the OS login item in sync with the stored preference.
     applyLaunchAtStartup(store.get('launchAtStartup'))
+
+    // INSTANT WAKE: pre-build the hidden overlay + Gemini windows and warm
+    // the OS capture pipeline shortly after startup, so the first hotkey
+    // press only has to show already-loaded surfaces.
+    setTimeout(() => {
+      prewarmOverlays()
+      prewarmGeminiWidget()
+    }, 600)
 
     // Validate the stored API key in the background (instant first ask).
     setTimeout(() => {
@@ -100,6 +111,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('will-quit', () => {
     globalShortcut.unregisterAll()
     destroyTray()
+    destroyGdiCapture()
   })
 
   // Safety: any uncaught exception in the main process should not kill the

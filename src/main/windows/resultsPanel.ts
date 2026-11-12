@@ -25,8 +25,10 @@ let boundEmptyDetection = false
 function writeUploadPage(dataUrl: string): string {
   const b64 = dataUrl.replace(/^data:image\/\w+;base64,/, '')
   const html = `<!doctype html>
-<html><body style="background:#101014;color:#eee;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
-<div id="msg">Opening Google Lens…</div>
+<html><body style="background:#0b0b10;color:#eee;font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;gap:18px;align-items:center;justify-content:center;height:100vh;margin:0">
+<div style="width:34px;height:34px;border-radius:50%;border:3px solid rgba(126,166,255,0.2);border-top-color:#7ea6ff;animation:gdcspin 0.9s linear infinite"></div>
+<div id="msg" style="font-size:13px;opacity:0.85">Opening Google Lens…</div>
+<style>@keyframes gdcspin{to{transform:rotate(360deg)}}</style>
 <form id="f" method="POST" action="https://lens.google.com/upload" enctype="multipart/form-data">
   <input type="file" name="encoded_image" hidden>
 </form>
@@ -52,36 +54,83 @@ function writeUploadPage(dataUrl: string): string {
   return 'file:///' + file.replace(/\\/g, '/')
 }
 
-/** Inject the floating status bar into the Google results page. */
+/** Inject the floating glass toolbar into the Google results page. */
 function injectStatusBar(win: BrowserWindow, empty: boolean): void {
-  const css = 'position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:2147483647;' +
-    'display:flex;gap:8px;align-items:center;padding:8px 14px;border-radius:999px;' +
-    'background:rgba(18,18,22,0.92);border:1px solid rgba(255,255,255,0.18);color:#eee;' +
-    'font-family:system-ui,sans-serif;font-size:12px;box-shadow:0 8px 26px rgba(0,0,0,0.5);'
-  const btn = 'border:1px solid rgba(255,255,255,0.28);background:rgba(255,255,255,0.1);color:#fff;' +
-    'padding:4px 12px;border-radius:999px;cursor:pointer;font-size:12px;font-family:inherit;'
-  const bar = empty
-    ? `<span>Lens looks empty</span>` +
-      `<button id="gdc-retry" style="${btn}">Retry</button>` +
-      `<button id="gdc-browser" style="${btn}">Open in browser</button>`
-    : `<span style="opacity:0.85">Google Lens</span>`
+  const barCss =
+    'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:2147483647;' +
+    'display:flex;gap:6px;align-items:center;padding:7px 10px;border-radius:16px;' +
+    'background:#232428;border:1px solid #43444c;' +
+    'box-shadow:0 12px 40px rgba(0,0,0,0.5);' +
+    'font-family:system-ui,"Segoe UI",sans-serif;font-size:12px;color:#eee;'
+  const btnCss =
+    'display:inline-flex;align-items:center;gap:6px;border:1px solid #43444c;' +
+    'background:#2a2b30;color:#fff;padding:6px 12px;border-radius:10px;' +
+    'cursor:pointer;font-size:12px;font-family:inherit;font-weight:500;' +
+    'transition:background 150ms ease,transform 150ms ease;'
+  const primaryCss =
+    'display:inline-flex;align-items:center;gap:6px;border:1px solid #5b77c4;' +
+    'background:#5b77c4;color:#fff;padding:6px 12px;' +
+    'border-radius:10px;cursor:pointer;font-size:12px;font-family:inherit;font-weight:600;' +
+    'transition:filter 150ms ease,transform 150ms ease;'
+  const labelCss = 'opacity:0.75;padding:0 4px;white-space:nowrap;'
   const script = `
     (function () {
       document.getElementById('gdc-bar')?.remove()
       var bar = document.createElement('div')
       bar.id = 'gdc-bar'
-      bar.style.cssText = ${JSON.stringify(css)}
-      bar.innerHTML = ${JSON.stringify(bar)}
+      bar.style.cssText = ${JSON.stringify(barCss)}
+      var btnCss = ${JSON.stringify(btnCss)}
+      var primaryCss = ${JSON.stringify(primaryCss)}
+      function mk(id, label, primary) {
+        var b = document.createElement('button')
+        b.id = id
+        b.textContent = label
+        b.style.cssText = primary ? primaryCss : btnCss
+        b.addEventListener('mouseenter', function () {
+          b.style.background = primary ? '#6b87d4' : '#313238'
+          b.style.transform = 'translateY(-1px)'
+        })
+        b.addEventListener('mouseleave', function () {
+          b.style.background = primary ? '#5b77c4' : '#2a2b30'
+          b.style.transform = ''
+        })
+        bar.appendChild(b)
+        return b
+      }
+      var label = document.createElement('span')
+      label.style.cssText = ${JSON.stringify(labelCss)}
+      label.textContent = ${JSON.stringify(empty ? 'Lens looks empty —' : 'Google Lens')}
+      bar.appendChild(label)
+      var ask = mk('gdc-ask', '✦ Ask Gemini', true)
+      var copy = mk('gdc-copy', 'Copy')
+      var save = mk('gdc-save', 'Save')
+      var retry = mk('gdc-retry', 'Retry')
+      var web = mk('gdc-browser', 'Browser')
+      var close = mk('gdc-close', '✕')
+      close.title = 'Close (Esc)'
+      function flash(b, text) {
+        var old = b.textContent
+        b.textContent = text
+        setTimeout(function () { b.textContent = old }, 1400)
+      }
+      ask.addEventListener('click', function () { try { window.gdc.lens.askGemini() } catch (e) {} })
+      copy.addEventListener('click', function () {
+        try { window.gdc.lens.copyImage().then(function (r) { flash(copy, r && r.ok ? '✓ Copied' : 'Failed') }) } catch (e) {}
+      })
+      save.addEventListener('click', function () {
+        try { window.gdc.lens.saveImage().then(function (r) { flash(save, r && r.ok ? '✓ Saved' : 'Cancelled') }) } catch (e) {}
+      })
+      retry.addEventListener('click', function () { try { window.gdc.lens.analyze() } catch (e) {} bar.remove() })
+      web.addEventListener('click', function () { try { window.gdc.lens.openWeb() } catch (e) {} })
+      close.addEventListener('click', function () { try { window.gdc.lens.closePanel() } catch (e) {} })
       document.body.appendChild(bar)
-      var retry = document.getElementById('gdc-retry')
-      if (retry) retry.addEventListener('click', function () {
-        try { window.gdc.lens.analyze() } catch (e) {}
-        bar.remove()
-      })
-      var open = document.getElementById('gdc-browser')
-      if (open) open.addEventListener('click', function () {
-        try { window.gdc.lens.openWeb() } catch (e) {}
-      })
+      try {
+        bar.animate(
+          [{ opacity: 0, transform: 'translateX(-50%) translateY(14px)' },
+           { opacity: 1, transform: 'translateX(-50%) translateY(0)' }],
+          { duration: 260, easing: 'cubic-bezier(0.32, 0.72, 0, 1)', fill: 'both' }
+        )
+      } catch (e) {}
     })()
   `
   void win.webContents.executeJavaScript(script).catch(() => {})

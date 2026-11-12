@@ -1,19 +1,24 @@
-import type { CircleMode } from '../../shared/types'
+import type { CapturePayload, CapturePrefs, CircleMode, SelectionRect } from '../../shared/types'
+import { DEFAULT_PREFS } from '../../shared/types'
 
 /**
  * Circle to Search overlay:
- *  1. paints the frozen screenshot pixel-perfectly,
- *  2. captures a drag rectangle,
- *  3. crops it at native resolution and hands it to the main process.
+ *  1. wakes instantly with the Apple-Intelligence rim glow over the LIVE
+ *     screen (the window is transparent until the frozen frame arrives),
+ *  2. paints the frozen screenshot pixel-perfectly once captured,
+ *  3. captures a drag rectangle and hands the RECT to the main process,
+ *     which crops the lossless original — the delivered image can never
+ *     contain the overlay, the dim, or the selection UI.
  */
 
 const img = document.getElementById('shot') as HTMLImageElement
-const dim = document.getElementById('dim') as HTMLDivElement
 const sel = document.getElementById('sel') as HTMLDivElement
 const selBox = document.getElementById('sel-box') as HTMLDivElement
 const selBadge = document.getElementById('sel-badge') as HTMLDivElement
 const hintText = document.getElementById('hint-text') as HTMLElement
+const hintSpinner = document.getElementById('hint-spinner') as HTMLElement
 const attachHint = document.getElementById('attach-hint') as HTMLElement
+const flash = document.getElementById('flash') as HTMLDivElement
 
 let mode: CircleMode = 'lens'
 let lensMode = false
@@ -24,9 +29,8 @@ let startX = 0
 let startY = 0
 /** True once the frozen frame is painted — selection is gated on this. */
 let frozenReady = false
-// 1×1 transparent GIF. Setting this (not just removing src) guarantees the
-// <img> stops displaying the previous session's screenshot: Chromium keeps
-// showing the last decoded bitmap until a new load begins.
+// 1×1 transparent GIF: guarantees the <img> stops displaying the previous
+// session's screenshot (Chromium keeps the last decoded bitmap otherwise).
 const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
 
 init().catch((err) => {
@@ -34,50 +38,62 @@ init().catch((err) => {
   void window.gdc.circle.cancel()
 })
 
-/** Push a dim-only state while desktopCapturer is still running. */
-function enterWaiting(m: CircleMode): void {
+/* ── Preferences → body classes ────────────────────────────────────────── */
+function applyPrefs(prefs: CapturePrefs): void {
+  const b = document.body
+  b.classList.toggle('glow-off', !prefs.glow)
+  b.classList.remove('glow-subtle', 'glow-balanced', 'glow-vivid')
+  b.classList.add(`glow-${prefs.glowIntensity}`)
+  b.classList.remove('dim-none', 'dim-light', 'dim-classic')
+  b.classList.add(`dim-${prefs.selectionDim}`)
+}
+
+/* ── Session states ────────────────────────────────────────────────────── */
+/** Glow-only waiting state while desktopCapturer is still running. */
+function enterWaiting(m: CircleMode, prefs: CapturePrefs): void {
   mode = m
   frozenReady = false
   lensMode = false
-  document.body.classList.remove('lens-mode')
+  applyPrefs(prefs)
+  document.body.classList.remove('lens-mode', 'ready', 'dragging')
+  document.body.classList.add('awake', 'capturing')
   resetSelection()
-  // A reused overlay still holds the PREVIOUS session's frozen frame — swap
-  // in a transparent pixel so nothing stale can render (removeAttribute alone
-  // leaves the last decoded bitmap on screen). Handlers are detached first:
-  // this instant load must never resolve a later applyCapture's wait.
   img.onload = null
   img.onerror = null
   img.src = TRANSPARENT_PIXEL
-  hintText.textContent = 'Capturing screen…'
+  hintText.textContent = 'Preparing screen…'
+  hintSpinner.hidden = false
   attachHint.hidden = true
-  document.body.classList.add('ready')
-  // Painted (dim + hint) — clear the main-process ready watchdog now.
   window.gdc.circle.ready()
 }
 
 function setHints(): void {
-  hintText.textContent = 'Drag to select anything on screen'
+  hintSpinner.hidden = true
   attachHint.hidden = true
   if (mode === 'attach') {
     hintText.textContent = 'Drag over the region to attach'
     attachHint.hidden = false
+  } else {
+    hintText.textContent = 'Drag to select anything on screen'
   }
 }
 
-async function applyCapture(dataUrl: string, sf: number, m: CircleMode): Promise<void> {
-  mode = m
-  scaleFactor = sf
+async function applyCapture(payload: CapturePayload): Promise<void> {
+  mode = payload.mode
+  scaleFactor = payload.scaleFactor
   lensMode = false
-  document.body.classList.remove('lens-mode')
+  applyPrefs(payload.prefs ?? DEFAULT_PREFS)
+  document.body.classList.remove('lens-mode', 'dragging')
+  document.body.classList.add('awake')
   resetSelection()
   setHints()
   await new Promise<void>((resolve) => {
     img.onload = () => resolve()
     img.onerror = () => resolve() // Esc still works; main watchdog still armed
-    img.src = dataUrl
+    img.src = payload.dataUrl ?? TRANSPARENT_PIXEL
   })
-  frozenReady = true
-  // Smooth fade-in of the frozen screen.
+  frozenReady = !!payload.dataUrl
+  document.body.classList.remove('capturing')
   document.body.classList.add('ready')
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
   window.gdc.circle.ready()
@@ -86,27 +102,25 @@ async function applyCapture(dataUrl: string, sf: number, m: CircleMode): Promise
 async function init(): Promise<void> {
   // Warm reuse pushes frames through onSetImage — listen BEFORE any await
   // so an early frame can never race this setup.
-  window.gdc.circle.onSetImage((payload) => {
-    const p = payload as { dataUrl: string | null; scaleFactor: number; mode: CircleMode }
+  window.gdc.circle.onSetImage((raw) => {
+    const p = raw as CapturePayload
     if (!p.dataUrl) {
-      enterWaiting(p.mode)
+      enterWaiting(p.mode, p.prefs ?? DEFAULT_PREFS)
       return
     }
-    void applyCapture(p.dataUrl, p.scaleFactor, p.mode)
+    void applyCapture(p)
   })
+  window.gdc.settings.onPrefsChanged((raw) => applyPrefs(raw as CapturePrefs))
 
-  const capture = await window.gdc.circle.getCapture()
-  if (capture) {
-    await applyCapture(capture.dataUrl, capture.scaleFactor, capture.mode)
+  const capture = (await window.gdc.circle.getCapture()) as CapturePayload | null
+  if (capture?.dataUrl) {
+    await applyCapture(capture)
   } else {
-    // Instant open: the window was shown BEFORE the capture finished —
-    // hold the dim until the frozen frame arrives via onSetImage.
-    enterWaiting('lens')
+    enterWaiting(capture?.mode ?? 'lens', capture?.prefs ?? DEFAULT_PREFS)
   }
 }
 
-/* ── Esc handling ──────────────────────────────────────────────────────── */
-// Results panel opened → the frozen screen relaxes into "click to dismiss".
+/* ── Lens mode (results open) ──────────────────────────────────────────── */
 window.gdc.circle.onSetLensMode(() => {
   lensMode = true
   document.body.classList.add('lens-mode')
@@ -118,10 +132,8 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     e.preventDefault()
     if (dragging) {
-      // Mid-drag: abandon the current selection but keep the overlay up.
       resetSelection()
     } else {
-      // Spec: Esc dismisses the whole Circle to Search experience instantly.
       void window.gdc.circle.dismissAll()
     }
   }
@@ -129,7 +141,6 @@ window.addEventListener('keydown', (e) => {
 
 /* ── Selection drag ────────────────────────────────────────────────────── */
 sel.addEventListener('pointerdown', (e) => {
-  // No frozen frame yet (still capturing) — a drag now would crop garbage.
   if (!frozenReady) return
   if (lensMode) {
     // Any click on the frozen screen while results are open dismisses all.
@@ -146,6 +157,7 @@ sel.addEventListener('pointerdown', (e) => {
   } catch {
     /* pointer may already be gone */
   }
+  document.body.classList.add('dragging')
   selBox.style.display = 'block'
   updateBox(e.clientX, e.clientY)
 })
@@ -156,38 +168,29 @@ sel.addEventListener('pointermove', (e) => {
   updateBox(e.clientX, e.clientY)
 })
 
-// A cancelled pointer (gesture takeover, device switch) must not leave a
-// half-dead drag state behind.
 sel.addEventListener('pointercancel', () => {
   dragging = false
   resetSelection()
 })
 
-// Right-click must never open a menu over the frozen screen.
 window.addEventListener('contextmenu', (e) => e.preventDefault())
 
 sel.addEventListener('pointerup', (e) => {
   if (!dragging) return
   dragging = false
+  document.body.classList.remove('dragging')
   const rect = normalizedRect(e.clientX, e.clientY)
 
   if (!moved) {
-    // A plain click (no drag):
-    //  - attach mode → attach the entire screen (most forgiving default)
-    //  - lens mode   → treat as a dismiss
-    if (mode === 'attach') {
-      void submitCrop({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight })
-    } else {
-      void window.gdc.circle.dismissAll()
-    }
+    // A plain click (no drag) searches / attaches the WHOLE screen.
+    submitRect({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight })
     return
   }
-
   if (rect.width < 10 || rect.height < 10) {
     resetSelection()
     return
   }
-  void submitCrop(rect)
+  submitRect(rect)
 })
 
 function updateBox(x: number, y: number): void {
@@ -201,10 +204,12 @@ function updateBox(x: number, y: number): void {
     rect.height * scaleFactor
   )} px`
   selBadge.style.left = `${rect.x}px`
-  selBadge.style.top = `${rect.y + rect.height}px`
+  // Keep the badge on screen: flip above the box near the bottom edge.
+  const below = rect.y + rect.height + 34 < window.innerHeight
+  selBadge.style.top = below ? `${rect.y + rect.height}px` : `${rect.y - 32}px`
 }
 
-function normalizedRect(x: number, y: number): { x: number; y: number; width: number; height: number } {
+function normalizedRect(x: number, y: number): SelectionRect {
   return {
     x: Math.min(startX, x),
     y: Math.min(startY, y),
@@ -216,42 +221,19 @@ function normalizedRect(x: number, y: number): { x: number; y: number; width: nu
 function resetSelection(): void {
   selBox.style.display = 'none'
   selBadge.hidden = true
-  dim.style.background = 'rgba(0, 0, 0, 0.34)'
+  document.body.classList.remove('dragging')
 }
 
-/** Crop the frozen screenshot at physical-pixel resolution and send it up. */
-async function submitCrop(rect: {
-  x: number
-  y: number
-  width: number
-  height: number
-}): Promise<void> {
-  try {
-    const sx = Math.max(0, Math.round(rect.x * scaleFactor))
-    const sy = Math.max(0, Math.round(rect.y * scaleFactor))
-    const sw = Math.min(img.naturalWidth - sx, Math.round(rect.width * scaleFactor))
-    const sh = Math.min(img.naturalHeight - sy, Math.round(rect.height * scaleFactor))
-    if (sw <= 2 || sh <= 2) {
-      resetSelection()
-      return
-    }
-
-    const canvas = document.createElement('canvas')
-    canvas.width = sw
-    canvas.height = sh
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('canvas 2d unavailable')
-    ctx.imageSmoothingEnabled = false
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh)
-    const dataUrl = canvas.toDataURL('image/png')
-
-    selBox.style.display = 'none'
-    selBadge.hidden = true
-    await window.gdc.circle.selectFinished(dataUrl)
-    // In 'attach' mode the main process closed this overlay already; in
-    // 'lens' mode it switched us to lens-mode via the event.
-  } catch (err) {
-    console.error('crop failed', err)
-    resetSelection()
-  }
+/** Play the capture flash, then hand the rect to main for a lossless crop. */
+function submitRect(rect: SelectionRect): void {
+  flash.style.left = `${rect.x}px`
+  flash.style.top = `${rect.y}px`
+  flash.style.width = `${rect.width}px`
+  flash.style.height = `${rect.height}px`
+  flash.classList.remove('go')
+  void flash.offsetWidth // restart the animation
+  flash.classList.add('go')
+  selBox.style.display = 'none'
+  selBadge.hidden = true
+  void window.gdc.circle.selectRect(rect)
 }

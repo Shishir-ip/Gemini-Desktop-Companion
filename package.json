@@ -1,8 +1,24 @@
 {
   "name": "gemini-desktop-companion",
   "productName": "Gemini Desktop Companion",
-  "version": "3.6.1",
-  "description": "Android-style Circle to Search + Hold to Gemini for Windows — a glassmorphic AI companion living in your system tray.",
+  "version": "4.1.0",
+  "description": "Circle to Search + Hold to Gemini for Windows — Android-style AI screen search with Google Lens and a floating Gemini pill. Instant wake, clean lossless captures, Apple-Intelligence-style glow.",
+  "keywords": [
+    "circle-to-search",
+    "gemini",
+    "google-lens",
+    "windows",
+    "electron",
+    "ai-assistant",
+    "screen-capture",
+    "screenshot-tool",
+    "hold-to-gemini",
+    "desktop-app",
+    "google-gemini",
+    "ai-search",
+    "screen-selection",
+    "tray-app"
+  ],
   "main": "out/main/index.js",
   "author": {
     "name": "Shishir",

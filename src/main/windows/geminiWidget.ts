@@ -5,10 +5,12 @@ import { loadRendererPage, preloadPath } from '../paths'
 import { log } from '../logger'
 
 let widget: BrowserWindow | null = null
+let resizeIpcBound = false
 
 const READY_WATCHDOG_MS = 7000
 const WIDGET_WIDTH = 720
-const WIDGET_HEIGHT = 480
+const PILL_HEIGHT = 92
+const BOTTOM_MARGIN = 48
 
 function cursorDisplay(): Display {
   try {
@@ -18,47 +20,81 @@ function cursorDisplay(): Display {
   }
 }
 
+/** Bottom-center anchor, Android-style: the palette grows UPWARD. */
+function anchoredBounds(display: Display, height: number): Electron.Rectangle {
+  const wa = display.workArea
+  return {
+    x: wa.x + Math.round((wa.width - WIDGET_WIDTH) / 2),
+    y: wa.y + wa.height - height - BOTTOM_MARGIN,
+    width: WIDGET_WIDTH,
+    height
+  }
+}
+
 /**
- * Show (or focus) the floating Gemini palette.
- *
- * SOLID window (no transparency) at 720×480 — shows in the taskbar,
- * can be minimized, fully interactive every time it opens.
+ * Pre-create the (hidden) Gemini pill at startup so Alt+Space only has to
+ * show a fully-loaded window — instant wake, every time.
+ */
+export function prewarmGeminiWidget(): void {
+  if (!widget || widget.isDestroyed()) buildWidget()
+}
+
+/**
+ * Show (or focus) the floating Gemini pill, anchored a comfortable margin
+ * above the bottom edge. The pill pops up with a spring animation.
  */
 export function showGeminiWidget(): void {
-  if (widget && !widget.isDestroyed()) {
-    widget.show()
-    widget.focus()
-    widget.webContents.focus()
-    widget.webContents.send(IPC.WidgetShown)
-    return
+  if (!widget || widget.isDestroyed()) buildWidget()
+  if (!widget) return
+  const display = cursorDisplay()
+  const height = widget.getBounds().height || PILL_HEIGHT
+  widget.setBounds(anchoredBounds(display, height))
+  widget.show()
+  widget.focus()
+  widget.webContents.focus()
+  widget.webContents.send(IPC.WidgetShown)
+}
+
+function buildWidget(): void {
+  // Self-sizing: the renderer reports its content height; the window hugs
+  // the pill/chat and stays anchored to the bottom edge as it grows.
+  if (!resizeIpcBound) {
+    resizeIpcBound = true
+    ipcMain.on(IPC.WidgetResize, (event, height: number) => {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      if (!win || win.isDestroyed() || win !== widget) return
+      if (typeof height !== 'number' || !Number.isFinite(height)) return
+      const display = screen.getDisplayMatching(win.getBounds())
+      const maxH = Math.max(220, display.workArea.height - 48)
+      const h = Math.max(70, Math.min(maxH, Math.round(height)))
+      const b = win.getBounds()
+      if (b.height !== h) win.setBounds(anchoredBounds(display, h))
+    })
   }
 
   const display = cursorDisplay()
-  const wa = display.workArea
-  const x = wa.x + Math.round((wa.width - WIDGET_WIDTH) / 2)
-  const y = wa.y + Math.max(20, Math.round((wa.height - WIDGET_HEIGHT) / 2) - 20)
 
   widget = new BrowserWindow({
-    x,
-    y,
-    width: WIDGET_WIDTH,
-    height: WIDGET_HEIGHT,
+    ...anchoredBounds(display, PILL_HEIGHT),
     show: false,
     frame: false,
-    transparent: false,
+    // The window alpha is only the pill's rounded silhouette — every
+    // surface inside is fully solid (no frosted glass anywhere).
+    transparent: true,
     resizable: false,
     movable: true,
     minimizable: true,
     maximizable: false,
     skipTaskbar: false,
-    roundedCorners: true,
-    backgroundColor: '#1c1c22',
+    hasShadow: false,
+    backgroundColor: '#00000000',
     title: 'Gemini',
     webPreferences: {
       preload: preloadPath('index'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      backgroundThrottling: false
     }
   })
   widget.setAlwaysOnTop(true, 'screen-saver')
@@ -94,9 +130,6 @@ export function showGeminiWidget(): void {
   })
   widget.once('ready-to-show', () => {
     if (!widget || widget.isDestroyed()) return
-    widget.show()
-    widget.focus()
-    widget.webContents.focus()
     widget.webContents.invalidate()
   })
   widget.on('closed', () => {
@@ -117,7 +150,7 @@ export function minimizeWidget(): void {
   if (widget && !widget.isDestroyed()) widget.minimize()
 }
 
-/** Hide the palette (chat context persists — clicking the taskbar restores). */
+/** Hide the palette (chat context persists — the hotkey restores it). */
 export function hideGeminiWidget(): void {
   if (widget && !widget.isDestroyed()) widget.hide()
 }

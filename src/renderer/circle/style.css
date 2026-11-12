@@ -1,5 +1,9 @@
-/* Circle to Search overlay — pixel-perfect frozen screen + selection canvas */
+/* Circle to Search overlay — frozen screen + Apple-Intelligence rim glow.
+   All motion is opacity/transform only (compositor-friendly): the rim is a
+   stack of inset box-shadows computed ONCE, and hue travel comes from
+   cross-fading two pre-painted layers, never from repainting shadows. */
 
+/* ── Frozen frame ──────────────────────────────────────────────────────── */
 #shot {
   position: fixed;
   inset: 0;
@@ -8,73 +12,192 @@
   object-fit: fill;
   z-index: 0;
   pointer-events: none;
-}
-
-#dim {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.34);
-  z-index: 1;
-  transition: background 200ms var(--ease-ios);
-}
-
-body.lens-mode #dim {
-  background: rgba(0, 0, 0, 0.12);
-}
-
-#hint {
-  position: fixed;
-  top: 22px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 18px;
-  border-radius: 999px;
-  background: rgba(20, 20, 20, 0.78);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.92);
-  /* State-driven visibility — NOT an animation fill. A `both`-filled
-     animation locks opacity at the final keyframe and BEATS every cascade
-     rule, which is exactly how both hint pills used to render at once. */
   opacity: 0;
-  transition: opacity 200ms var(--ease-ios);
+  transition: opacity 240ms var(--ease-ios);
 }
-body.ready #hint {
+body.ready #shot {
   opacity: 1;
 }
-.hint-icon {
-  color: #7ea6ff;
-  font-size: 16px;
+
+/* Gentle fallback tint — only when the user disables the glow. */
+#fallback-dim {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: rgba(4, 6, 14, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms var(--ease-ios);
 }
-.hint-sep {
-  color: rgba(255, 255, 255, 0.25);
+body.glow-off.awake #fallback-dim {
+  opacity: 1;
 }
 
+/* ── The rim light ─────────────────────────────────────────────────────── */
+:root {
+  --rim-1: #4f8cff; /* top — Gemini blue */
+  --rim-2: #a855f7; /* bottom — violet */
+  --rim-3: #2ec8ff; /* left — cyan */
+  --rim-4: #ff2e88; /* right — pink */
+  --rim-level: 0.85;
+}
+body.glow-subtle {
+  --rim-level: 0.5;
+}
+body.glow-balanced {
+  --rim-level: 0.85;
+}
+body.glow-vivid {
+  --rim-level: 1;
+}
+
+#rim {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none; /* the single most important line — taps pass through */
+  opacity: 0;
+  transition: opacity 550ms var(--ease-ios);
+}
+body.awake #rim {
+  opacity: 1;
+  animation: rim-breathe 3.6s ease-in-out infinite;
+}
+body.awake.capturing #rim {
+  animation: rim-breathe-hot 2.2s ease-in-out infinite;
+}
+body.awake.lens-mode #rim {
+  animation: none;
+  opacity: 0.4;
+}
+body.glow-off #rim {
+  display: none;
+}
+
+.rim-layer {
+  position: absolute;
+  inset: 0;
+  background: transparent; /* only the shadows paint */
+  /* Desktop-tuned: 24px offset, 56px blur, -18px spread → 6px bright core
+     hugging each edge, feathering ~34px inward. Plus a white wash tying the
+     four edges together. */
+  box-shadow:
+    inset 0 24px 56px -18px var(--rim-1),
+    inset 0 -24px 56px -18px var(--rim-2),
+    inset 24px 0 56px -18px var(--rim-3),
+    inset -24px 0 56px -18px var(--rim-4),
+    inset 0 0 120px -60px rgba(255, 255, 255, 0.16);
+}
+/* Layer B: identical stack, hues rotated one edge around → cross-fading the
+   two layers makes the color appear to travel without any repaint. */
+.rim-b {
+  box-shadow:
+    inset 0 24px 56px -18px var(--rim-3),
+    inset 0 -24px 56px -18px var(--rim-4),
+    inset 24px 0 56px -18px var(--rim-2),
+    inset -24px 0 56px -18px var(--rim-1),
+    inset 0 0 120px -60px rgba(255, 255, 255, 0.16);
+  opacity: 0;
+}
+body.awake .rim-a {
+  animation: rim-cross 9s ease-in-out infinite;
+}
+body.awake .rim-b {
+  animation: rim-cross 9s ease-in-out -4.5s infinite;
+}
+body.awake.capturing .rim-a {
+  animation-duration: 4.5s;
+}
+body.awake.capturing .rim-b {
+  animation-duration: 4.5s;
+  animation-delay: -2.25s;
+}
+
+@keyframes rim-cross {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes rim-breathe {
+  0%,
+  100% {
+    opacity: calc(var(--rim-level) * 0.72);
+  }
+  50% {
+    opacity: var(--rim-level);
+  }
+}
+@keyframes rim-breathe-hot {
+  0%,
+  100% {
+    opacity: calc(var(--rim-level) * 0.85);
+  }
+  50% {
+    opacity: var(--rim-level);
+  }
+}
+
+/* ── Hint pills ────────────────────────────────────────────────────────── */
+#hint,
 #lens-hint {
   position: fixed;
   top: 22px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 3;
-  padding: 9px 16px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
   border-radius: 999px;
-  background: rgba(20, 20, 20, 0.78);
-  -webkit-backdrop-filter: blur(24px);
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.8);
+  background: #232428;
+  border: 1px solid #43444c;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.92);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 200ms var(--ease-ios);
+  transition: opacity 240ms var(--ease-ios), transform 240ms var(--ease-ios);
+}
+body.awake #hint {
+  opacity: 1;
+  animation: hint-in 360ms var(--ease-ios) both;
+}
+body.lens-mode #hint {
+  opacity: 0;
+}
+body.lens-mode #lens-hint {
+  opacity: 1;
+  animation: hint-in 360ms var(--ease-ios) both;
+}
+@keyframes hint-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+.hint-spark {
+  color: #9db4e8;
+}
+.hint-sep {
+  color: rgba(255, 255, 255, 0.25);
+}
+.hint-spinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid rgba(126, 166, 255, 0.25);
+  border-top-color: #8ab4ff;
+  animation: gdc-spin 0.8s linear infinite;
 }
 
 #attach-hint {
@@ -82,33 +205,35 @@ body.ready #hint {
   bottom: 30px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 3;
+  z-index: 5;
   padding: 10px 18px;
   border-radius: 999px;
-  background: rgba(79, 140, 255, 0.16);
-  -webkit-backdrop-filter: blur(24px);
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(126, 166, 255, 0.4);
+  background: #232428;
+  border: 1px solid #5b77c4;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   font-size: 12.5px;
-  color: #cfe0ff;
+  color: #c7d4f2;
+  pointer-events: none;
+  animation: hint-in-bottom 360ms var(--ease-ios) both;
 }
-/* Lens mode — declared AFTER `body.ready #hint` so, at equal specificity,
-   source order makes lens-mode win (drag pill hides, lens pill shows). */
-body.lens-mode #hint {
-  opacity: 0;
-}
-body.lens-mode #lens-hint {
-  opacity: 1;
+@keyframes hint-in-bottom {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
+/* ── Selection surface ─────────────────────────────────────────────────── */
 #sel {
-  display: block; /* never hidden — it is the hit surface for the whole screen */
+  display: block;
   position: fixed;
   inset: 0;
-  z-index: 2;
+  z-index: 3;
   cursor: crosshair;
-  /* Required for pointer dragging on touch/pen devices — without it the
-     browser cancels the pointer for pan gestures and drawing silently dies. */
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
@@ -119,36 +244,162 @@ body.lens-mode #sel {
 
 #sel-box {
   position: absolute;
-  border: 1.5px solid rgba(255, 255, 255, 0.95);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 26px rgba(126, 166, 255, 0.45),
-    inset 0 0 22px rgba(126, 166, 255, 0.12);
   display: none;
+  border-radius: 10px;
+  /* Spotlight: everything OUTSIDE the selection dims while dragging.
+     One static shadow — no per-frame repaint cost. */
+  --sel-dim: 0.28;
+  box-shadow: 0 0 0 100vmax rgba(2, 4, 12, var(--sel-dim));
+}
+body.dim-none #sel-box {
+  --sel-dim: 0;
+}
+body.dim-light #sel-box {
+  --sel-dim: 0.28;
+}
+body.dim-classic #sel-box {
+  --sel-dim: 0.46;
+}
+body.dragging #sel-box {
+  animation: sel-in 140ms var(--ease-ios) both;
+}
+@keyframes sel-in {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Selection ring — a precise steel-blue line with a soft bloom. Two
+   pre-painted layers cross-fade for a subtle living edge (opacity only). */
+.sel-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  border: 2px solid #9db4e8;
+  pointer-events: none;
+}
+.ring-b {
+  border-color: #e7e8ec;
+  opacity: 0;
+}
+body.dragging .ring-a {
+  animation: rim-cross 4s ease-in-out infinite;
+}
+body.dragging .ring-b {
+  animation: rim-cross 4s ease-in-out -2s infinite;
+}
+
+/* Soft bloom hugging the ring */
+.sel-glow {
+  position: absolute;
+  inset: -2px;
+  border-radius: 12px;
+  box-shadow: 0 0 22px rgba(157, 180, 232, 0.45), inset 0 0 16px rgba(157, 180, 232, 0.12);
+  pointer-events: none;
+  animation: sel-breathe 2.4s ease-in-out infinite;
+}
+@keyframes sel-breathe {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Corner handles */
+.corner {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border: 3px solid #fff;
+  filter: drop-shadow(0 0 6px rgba(126, 166, 255, 0.9));
+  pointer-events: none;
+}
+.c-tl {
+  top: -3px;
+  left: -3px;
+  border-right: none;
+  border-bottom: none;
+  border-top-left-radius: 8px;
+}
+.c-tr {
+  top: -3px;
+  right: -3px;
+  border-left: none;
+  border-bottom: none;
+  border-top-right-radius: 8px;
+}
+.c-bl {
+  bottom: -3px;
+  left: -3px;
+  border-right: none;
+  border-top: none;
+  border-bottom-left-radius: 8px;
+}
+.c-br {
+  bottom: -3px;
+  right: -3px;
+  border-left: none;
+  border-top: none;
+  border-bottom-right-radius: 8px;
 }
 
 #sel-badge {
   position: absolute;
-  margin-top: 8px;
-  padding: 3px 9px;
-  border-radius: 7px;
-  background: rgba(20, 20, 20, 0.85);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  margin-top: 10px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: #232428;
+  border: 1px solid #43444c;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.92);
   white-space: nowrap;
+  pointer-events: none;
+  z-index: 6;
 }
 
-/* Smooth fade-in of the frozen screen */
-#shot,
-#dim {
+/* ── Capture flash ─────────────────────────────────────────────────────── */
+#flash {
+  position: absolute;
+  z-index: 6;
+  border-radius: 12px;
+  border: 2.5px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 40px rgba(126, 166, 255, 0.9), inset 0 0 30px rgba(126, 166, 255, 0.35);
   opacity: 0;
-  transition: opacity 260ms ease;
+  pointer-events: none;
 }
-body.ready #shot,
-body.ready #dim {
-  opacity: 1;
+#flash.go {
+  animation: flash-pop 340ms var(--ease-ios) both;
+}
+@keyframes flash-pop {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #rim,
+  .rim-layer,
+  .sel-glow,
+  .sel-ring {
+    animation: none !important;
+  }
+  body.awake #rim {
+    opacity: var(--rim-level);
+  }
+  .rim-b {
+    opacity: 0;
+  }
 }

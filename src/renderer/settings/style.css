@@ -1,20 +1,24 @@
-/* iOS-style Settings panel */
+/* Premium Settings panel — solid, professional */
 
 html,
 body {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
+  background: var(--app-bg);
 }
 
 #panel {
-  width: 880px;
-  height: 660px;
-  max-width: calc(100vw - 24px);
-  max-height: calc(100vh - 24px);
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: var(--app-bg);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  animation: gdc-fade-in 300ms var(--ease-ios) both;
 }
 
 /* ── Title bar ─────────────────────────────────────────────────────────── */
@@ -24,7 +28,8 @@ body {
   justify-content: space-between;
   padding: 16px 18px 14px 20px;
   -webkit-app-region: drag;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass-bg);
   flex-shrink: 0;
 }
 .tb-title {
@@ -38,6 +43,17 @@ body {
   width: 22px;
   height: 22px;
   border-radius: 6px;
+}
+.tb-logo-tile {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--grad-gem);
+  box-shadow: 0 2px 10px rgba(126, 166, 255, 0.45);
 }
 .version-badge {
   font-size: 11px;
@@ -153,10 +169,9 @@ body {
   background: rgba(255, 255, 255, 0.1);
 }
 .hotkey-recorder.recording {
-  border-color: rgba(126, 166, 255, 0.8);
-  background: rgba(126, 166, 255, 0.12);
-  box-shadow: 0 0 0 3px rgba(126, 166, 255, 0.15);
-  color: #cfe0ff;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-text);
 }
 .hotkey-recorder.conflict {
   border-color: rgba(255, 69, 58, 0.7);
@@ -270,6 +285,35 @@ button:disabled {
   color: var(--text-primary);
 }
 .seg-btn.active {
-  background: linear-gradient(135deg, rgba(79, 140, 255, 0.35), rgba(168, 85, 247, 0.35));
-  color: #fff;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+/* Row hover feedback */
+.row {
+  transition: background 200ms var(--ease-ios);
+}
+.row:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+/* Light theme refinements */
+html[data-theme='light'] .row + .row {
+  border-top-color: rgba(0, 0, 0, 0.06);
+}
+html[data-theme='light'] .hotkey-recorder {
+  border-color: rgba(0, 0, 0, 0.14);
+  background: rgba(0, 0, 0, 0.04);
+}
+html[data-theme='light'] .hotkey-static {
+  border-color: rgba(0, 0, 0, 0.14);
+}
+html[data-theme='light'] .tb-btn {
+  background: rgba(0, 0, 0, 0.05);
+}
+html[data-theme='light'] .tb-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+html[data-theme='light'] .row:hover {
+  background: rgba(0, 0, 0, 0.025);
 }

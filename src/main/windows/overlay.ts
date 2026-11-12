@@ -1,9 +1,14 @@
-import { BrowserWindow, ipcMain, screen } from 'electron'
+import { BrowserWindow, clipboard, ipcMain, nativeImage, screen } from 'electron'
 import type { Display } from 'electron'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { app } from 'electron'
 import { IPC } from '../../shared/ipc'
-import type { CircleMode } from '../../shared/types'
+import type { CapturePayload, CircleMode, SelectionRect } from '../../shared/types'
 import { loadRendererPage, preloadPath } from '../paths'
-import { captureAllDisplays, type DisplayCapture } from '../screenshot'
+import { captureAllDisplays, cropCapture, warmupCapturer, type DisplayCapture } from '../screenshot'
+import { gdiAvailable } from '../gdiCapture'
+import { getPrefs } from '../store'
 import { setPendingAttachment } from '../attachment'
 import { openResultsPanel } from './resultsPanel'
 import { hideGeminiWidget, showGeminiWidget } from './geminiWidget'
@@ -24,7 +29,7 @@ let sessionActive = false
 /** Monotonic session id — stale async captures must never touch a newer session. */
 let sessionGen = 0
 
-const READY_WATCHDOG_MS = 7000
+const READY_WATCHDOG_MS = 15000
 
 export function getCircleMode(): CircleMode {
   return mode
@@ -43,23 +48,60 @@ export function markOverlayReady(sender: Electron.WebContents): void {
   }
 }
 
+/**
+ * Pre-create one hidden overlay per display at startup. The hotkey path then
+ * only SHOWS a fully-loaded window — no BrowserWindow construction, no page
+ * load, no renderer boot on the critical path. This is what makes the wake
+ * feel instant.
+ */
+export function prewarmOverlays(): void {
+  for (const display of screen.getAllDisplays()) {
+    if (!overlays.has(display.id)) createOverlay(display, display.id)
+  }
+  // Warm the slow fallback only if GDI did not come up.
+  setTimeout(() => {
+    if (!gdiAvailable()) void warmupCapturer()
+  }, 4000)
+  // Monitor hot-plug / resolution changes: keep one overlay per display.
+  screen.on('display-metrics-changed', () => syncOverlaySet())
+  screen.on('display-added', () => syncOverlaySet())
+  screen.on('display-removed', () => syncOverlaySet())
+}
+
+function syncOverlaySet(): void {
+  const displays = screen.getAllDisplays()
+  const ids = new Set(displays.map((d) => d.id))
+  for (const [id, win] of overlays) {
+    if (!ids.has(id)) {
+      overlays.delete(id)
+      readyWindows.delete(win)
+      if (!win.isDestroyed()) win.destroy()
+    }
+  }
+  for (const display of displays) {
+    const existing = overlays.get(display.id)
+    if (existing && !existing.isDestroyed()) {
+      // Reposition to the display's (possibly changed) bounds.
+      existing.setBounds(display.bounds)
+    } else {
+      createOverlay(display, display.id)
+    }
+  }
+}
+
 /** Freeze every display behind a full-screen selection overlay. */
 export async function startCircleToSearch(
   m: CircleMode = 'lens',
   opts: { force?: boolean } = {}
 ): Promise<void> {
-  // RE-TRIGGER GUARD: a held key auto-repeats and double-taps land twice —
-  // each re-fire used to run a fresh capture WHILE the previous overlay was
-  // on screen, so every frozen frame baked the previous dim in (dims
-  // compounded → near-black captures → "the subject is too dark").
-  // While a session is running, further hotkey presses are ignored.
+  // RE-TRIGGER GUARD: a held key auto-repeats and double-taps land twice.
+  // While a session is running, further hotkey presses are ignored — this
+  // also guarantees only ONE overlay set can ever be on screen.
   if (sessionStarting || sessionActive) {
     if (!opts.force) {
       log('[circle] session already active — ignoring re-trigger')
       return
     }
-    // Explicit new intent (e.g. the palette's attach button) replaces the
-    // running session instead of being swallowed by it.
     closeAllSearchUI()
   }
   sessionStarting = true
@@ -76,50 +118,71 @@ async function runCircleSession(m: CircleMode): Promise<void> {
   mode = m
   lensModeActive = false
 
-  // Any floating glass window (palette, settings) sits at the same
-  // always-on-top level as the overlay and swallows clicks — including its
-  // large invisible interactive cards. Clear the stage first.
+  // Clear the stage: floating glass windows sit at the same always-on-top
+  // level and would swallow clicks.
   hideGeminiWidget()
   hideSettings()
 
-  // INSTANT OPEN: the overlay windows go up BEFORE the capture finishes.
-  // desktopCapturer takes 300-1500ms — awaiting it before showing anything
-  // was the "circle to search takes a while to open" bug. The renderer
-  // paints a dim-only "Capturing screen…" state; frames are pushed through
-  // IPC.CircleSetImage the moment they exist. The overlays are excluded
-  // from capture (setContentProtection) so the frozen frames stay clean.
-  captures = new Map() // stale frames from a previous session must not leak
+  captures = new Map()
+  const prefs = getPrefs()
+
+  // FAST PATH (GDI, ~250ms): capture BEFORE anything is shown. GDI does not
+  // honor capture-exclusion, so the frame is guaranteed clean by
+  // construction — no overlay, glow or dim can ever be baked in. The wake
+  // still feels instant, and the glow animates in over the frozen frame.
+  if (gdiAvailable()) {
+    const caps = await captureAllDisplays().catch((err) => {
+      log(`[circle] capture failed: ${String(err)}`)
+      return null as Map<number, DisplayCapture> | null
+    })
+    if (myGen !== sessionGen) return
+    if (caps && caps.size > 0) {
+      captures = caps
+      for (const display of screen.getAllDisplays()) {
+        const win = ensureOverlay(display)
+        const capture = caps.get(display.id)
+        win.webContents.send(IPC.CircleSetImage, {
+          dataUrl: capture?.previewUrl ?? null,
+          scaleFactor: display.scaleFactor,
+          mode,
+          prefs
+        } satisfies CapturePayload)
+        win.show()
+        win.focus()
+      }
+      log(`[circle] instant wake with frozen frames (mode: ${m}, ${caps.size} display(s))`)
+      return
+    }
+    // GDI produced nothing this time — fall through to the waiting flow.
+  }
+
+  // FALLBACK (desktopCapturer, slow on some machines): overlays go up
+  // immediately with the rim glow over the LIVE screen; frames are pushed
+  // the moment they exist. The overlays are capture-excluded, so frames
+  // stay clean on this path.
   const capturePromise = captureAllDisplays().catch((err) => {
     log(`[circle] capture failed: ${String(err)}`)
     return null as Map<number, DisplayCapture> | null
   })
-
   for (const display of screen.getAllDisplays()) {
-    const existing = overlays.get(display.id)
-    if (existing && !existing.isDestroyed()) {
-      // Warm reuse: page already loaded — reset to waiting and reshow
-      // (no window/page load at all on the fast path).
-      readyWindows.add(existing)
-      existing.webContents.send(IPC.CircleSetImage, { dataUrl: null, scaleFactor: 1, mode })
-      existing.show()
-      existing.focus()
-      log('[circle] overlay reused (fast path)')
-      continue
-    }
-    createOverlay(display, display.id)
+    const win = ensureOverlay(display)
+    win.webContents.send(IPC.CircleSetImage, {
+      dataUrl: null,
+      scaleFactor: display.scaleFactor,
+      mode,
+      prefs
+    } satisfies CapturePayload)
+    win.show()
+    win.focus()
   }
-  log(`[circle] overlays shown instantly (mode: ${m}, displays: ${screen.getAllDisplays().length})`)
+  log(`[circle] overlays shown (waiting flow, mode: ${m})`)
 
   const caps = await capturePromise
-  // A forced restart (attach button, tray) may have superseded this session
-  // while the capture was in flight — its frames are stale, and its failure
-  // paths must not close the NEW session's overlays either.
   if (myGen !== sessionGen) {
     log('[circle] capture finished after session was replaced — dropping stale frames')
     return
   }
   if (!caps || caps.size === 0) {
-    // Nothing captured — overlays must NOT linger as invisible input blocks.
     log('[circle] no displays captured — closing overlays')
     closeAllSearchUI()
     return
@@ -129,12 +192,24 @@ async function runCircleSession(m: CircleMode): Promise<void> {
     const win = overlays.get(displayId)
     if (!win || win.isDestroyed()) continue
     win.webContents.send(IPC.CircleSetImage, {
-      dataUrl: capture.dataUrl,
+      dataUrl: capture.previewUrl,
       scaleFactor: capture.scaleFactor,
-      mode
-    })
+      mode,
+      prefs
+    } satisfies CapturePayload)
   }
   log(`[circle] frozen frames pushed (${caps.size} displays)`)
+}
+
+/** Reuse the pre-warmed overlay for a display, or create it on demand. */
+function ensureOverlay(display: Display): BrowserWindow {
+  let win = overlays.get(display.id)
+  if (!win || win.isDestroyed()) {
+    createOverlay(display, display.id)
+    win = overlays.get(display.id)!
+  }
+  win.setBounds(display.bounds)
+  return win
 }
 
 function createOverlay(display: Display, displayId: number): void {
@@ -159,23 +234,19 @@ function createOverlay(display: Display, displayId: number): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      // The waiting-state repaint runs while the window is hidden (the
-      // dismiss-time frame clear) — background throttling would defer it and
-      // the stale frozen surface would resurface on the next show.
+      // The waiting-state repaint runs while the window is hidden —
+      // background throttling would defer it and a stale surface could
+      // resurface on the next show.
       backgroundThrottling: false
     }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
-  // EXCLUDE FROM CAPTURE: without this, the desktopCapturer grab (which runs
-  // while the overlay is already on screen in the instant-open flow) sees the
-  // overlay's own dim — the frozen frame captured the selection UI itself and
-  // repeated triggers compounded the darkness. WDA_EXCLUDEFROMCAPTURE keeps
-  // the overlay visible to the user but invisible to every capture path.
+  // EXCLUDE FROM CAPTURE: WDA_EXCLUDEFROMCAPTURE keeps the overlay visible to
+  // the user but invisible to every capture path — the frozen frames and all
+  // downstream crops stay perfectly clean.
   win.setContentProtection(true)
   windowDisplay.set(win, displayId)
   overlays.set(displayId, win)
-  // The frozen frame arrives via IPC.CircleSetImage once captured (or via
-  // IPC.CircleGetCapture if the renderer loads after the capture finished).
 
   // ── Safety rails: an overlay must NEVER linger as an invisible
   //    input-blocking window. Any failure path destroys it. ────────────────
@@ -197,8 +268,8 @@ function createOverlay(display: Display, displayId: number): void {
     clearTimeout(watchdog)
     closeAllSearchUI()
   })
-  // Guaranteed Esc kill-switch — handled in the MAIN process, so it works
-  // even if the renderer is dead, hung, or blank.
+  // Guaranteed Esc kill-switch — handled in MAIN, so it works even if the
+  // renderer is dead, hung, or blank.
   win.webContents.on('before-input-event', (_event, input) => {
     if (input.type === 'keyDown' && input.key === 'Escape') {
       closeAllSearchUI()
@@ -206,17 +277,18 @@ function createOverlay(display: Display, displayId: number): void {
   })
   win.once('ready-to-show', () => {
     if (win.isDestroyed()) return
-    win.show()
-    win.focus()
-    win.webContents.invalidate() // defensive repaint nudge for transparent windows
+    // Pre-warmed windows stay hidden until a session starts; only show here
+    // if a session is already waiting for this window.
+    if (sessionStarting || sessionActive) {
+      win.show()
+      win.focus()
+    }
+    win.webContents.invalidate()
   })
   win.on('closed', () => {
     clearTimeout(watchdog)
     readyWindows.delete(win)
     overlays.delete(displayId)
-    // Safety net: if every overlay window dies without a closeAll call
-    // (crash path), the session must not stay latched — the hotkey would
-    // be dead forever.
     if (overlays.size === 0) sessionActive = false
   })
 
@@ -224,41 +296,74 @@ function createOverlay(display: Display, displayId: number): void {
 }
 
 /** The renderer asks for its display's frozen frame once loaded. */
-export function getCaptureForWindow(win: BrowserWindow): {
-  dataUrl: string
-  scaleFactor: number
-  mode: CircleMode
-} | null {
+export function getCaptureForWindow(win: BrowserWindow): CapturePayload | null {
   const displayId = windowDisplay.get(win)
   if (displayId === undefined) return null
   const capture = captures.get(displayId)
-  if (!capture) return null
-  return { dataUrl: capture.dataUrl, scaleFactor: capture.scaleFactor, mode }
+  const prefs = getPrefs()
+  if (!capture) return { dataUrl: null, scaleFactor: 1, mode, prefs }
+  return { dataUrl: capture.previewUrl, scaleFactor: capture.scaleFactor, mode, prefs }
 }
 
 /**
- * A crop was completed on `displayId`. Route it to Lens or to the Gemini
- * widget depending on the active mode.
+ * A selection rect arrived from display `displayId`. Crop the LOSSLESS
+ * original in main (never the rendered UI), apply capture preferences, then
+ * route to Lens or to the Gemini widget depending on the active mode.
  */
-export function handleSelection(dataUrl: string, displayId: number): void {
+export function handleSelectionRect(rect: SelectionRect, displayId: number): void {
+  const capture = captures.get(displayId)
+  if (!capture) {
+    log('[circle] selection without a capture — ignoring')
+    return
+  }
+  const dataUrl = cropCapture(capture, rect)
+  if (!dataUrl) {
+    log('[circle] selection too small — ignoring')
+    return
+  }
+  log(`[circle] lossless crop ${Math.round(rect.width)}×${Math.round(rect.height)} (display ${displayId})`)
+  applyCapturePrefs(dataUrl)
+
   if (mode === 'attach') {
-    log('[circle] selection captured for Gemini attachment')
     setPendingAttachment({ dataUrl, source: 'selection', createdAt: Date.now() })
     closeAllOverlays()
     showGeminiWidget()
     return
   }
 
-  log('[circle] selection captured — opening results panel')
   const display =
     screen.getAllDisplays().find((d) => d.id === displayId) ?? screen.getPrimaryDisplay()
   lensModeActive = true
-  // Dim relaxes to "lens mode": the frozen screen stays visible behind the
+  // The frozen screen relaxes into "lens mode": it stays visible behind the
   // panel and any click outside the panel dismisses everything.
   for (const win of overlays.values()) {
     if (!win.isDestroyed()) win.webContents.send(IPC.CircleSetLensMode)
   }
   openResultsPanel(display, dataUrl)
+}
+
+/** Clipboard / auto-save preferences applied to every finished crop. */
+function applyCapturePrefs(dataUrl: string): void {
+  const prefs = getPrefs()
+  if (prefs.copyToClipboard) {
+    try {
+      clipboard.writeImage(nativeImage.createFromDataURL(dataUrl))
+    } catch (err) {
+      log(`[circle] clipboard copy failed: ${String(err)}`)
+    }
+  }
+  if (prefs.saveCaptures) {
+    try {
+      const dir = path.join(app.getPath('pictures'), 'Gemini Captures')
+      mkdirSync(dir, { recursive: true })
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const file = path.join(dir, `Capture ${stamp}.png`)
+      writeFileSync(file, Buffer.from(dataUrl.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
+      log(`[circle] capture saved: ${file}`)
+    } catch (err) {
+      log(`[circle] auto-save failed: ${String(err)}`)
+    }
+  }
 }
 
 export function isLensModeActive(): boolean {
@@ -270,13 +375,17 @@ export function closeAllOverlays(): void {
     if (win.isDestroyed()) continue
     // Clear the frozen frame BEFORE hiding: Windows keeps presenting a
     // hidden window's last rendered surface, so a warm reopen would flash
-    // the previous session's screenshot for the whole capture duration.
-    // The renderer swaps to dim-only while the window goes away.
-    win.webContents.send(IPC.CircleSetImage, { dataUrl: null, scaleFactor: 1, mode })
+    // the previous session's screenshot.
+    win.webContents.send(IPC.CircleSetImage, {
+      dataUrl: null,
+      scaleFactor: 1,
+      mode,
+      prefs: getPrefs()
+    } satisfies CapturePayload)
     win.hide()
   }
   lensModeActive = false
-  sessionActive = false // session over — the hotkey may start a new one
+  sessionActive = false
 }
 
 /** Esc / outside click — close panel + every overlay. */
@@ -292,11 +401,17 @@ export function registerOverlayIpc(): void {
     return win ? getCaptureForWindow(win) : null
   })
   ipcMain.on(IPC.CircleReady, (event) => markOverlayReady(event.sender))
-  ipcMain.handle(IPC.CircleSelected, (event, dataUrl: string) => {
+  ipcMain.handle(IPC.CircleSelectRect, (event, rect: SelectionRect) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     const displayId = win ? displayIdForWindow(win) : null
-    if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
-      handleSelection(dataUrl, displayId ?? screen.getPrimaryDisplay().id)
+    if (
+      rect &&
+      typeof rect.x === 'number' &&
+      typeof rect.y === 'number' &&
+      typeof rect.width === 'number' &&
+      typeof rect.height === 'number'
+    ) {
+      handleSelectionRect(rect, displayId ?? screen.getPrimaryDisplay().id)
     }
   })
   ipcMain.handle(IPC.CircleCancel, () => {

@@ -19,7 +19,8 @@ extraResources:
 
 win:
   icon: build/icon.ico
-  artifactName: Gemini-Desktop-Companion-Setup-${version}.${ext}
+  # Stable asset name so the README's "latest/download/…" button never breaks.
+  artifactName: Gemini-Desktop-Companion-Setup.${ext}
   target:
     - target: nsis
       arch:

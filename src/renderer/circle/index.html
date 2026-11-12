@@ -11,26 +11,56 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
+    <!-- Frozen screenshot (fades in once captured) -->
     <img id="shot" alt="" draggable="false" />
-    <div id="dim"></div>
+
+    <!-- Fallback tint when the glow is disabled -->
+    <div id="fallback-dim"></div>
+
+    <!-- Apple-Intelligence-style rim light: two cross-fading inset-shadow
+         layers, opacity-only animation, never intercepts pointer events. -->
+    <div id="rim" aria-hidden="true">
+      <div class="rim-layer rim-a"></div>
+      <div class="rim-layer rim-b"></div>
+    </div>
+
+    <!-- Top hint pill -->
     <div id="hint">
-      <span class="hint-icon">⌖</span>
-      <span id="hint-text">Drag to select anything on screen</span>
+      <svg class="hint-spark" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 2c.6 4.8 2.4 7.4 9 8-6.6.6-8.4 3.2-9 8-.6-4.8-2.4-7.4-9-8 6.6-.6 8.4-3.2 9-8Z"/>
+        <path d="M19 14c.3 2.2 1.1 3.4 4 3.7-2.9.3-3.7 1.5-4 3.7-.3-2.2-1.1-3.4-4-3.7 2.9-.3 3.7-1.5 4-3.7Z" opacity="0.7"/>
+      </svg>
+      <span id="hint-spinner" class="hint-spinner" hidden></span>
+      <span id="hint-text">Preparing screen…</span>
       <span class="hint-sep">·</span>
       <span class="text-secondary">Esc to cancel</span>
     </div>
+
     <div id="lens-hint">
-      Results are open on the right — click anywhere here to dismiss
+      <span>Results are open — click anywhere here to dismiss</span>
     </div>
-    <div id="attach-hint" class="anim-fade-in" hidden>
+
+    <div id="attach-hint" hidden>
       Click = attach the whole screen · or drag over a region
     </div>
+
+    <!-- Selection hit surface -->
     <div id="sel">
       <div id="sel-box">
-        <div id="sel-dim-corners"></div>
+        <div class="sel-glow"></div>
+        <div class="sel-ring ring-a"></div>
+        <div class="sel-ring ring-b"></div>
+        <div class="corner c-tl"></div>
+        <div class="corner c-tr"></div>
+        <div class="corner c-bl"></div>
+        <div class="corner c-br"></div>
       </div>
       <div id="sel-badge" hidden>0 × 0</div>
     </div>
+
+    <!-- Capture flash (plays on submit) -->
+    <div id="flash" aria-hidden="true"></div>
+
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

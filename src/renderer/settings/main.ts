@@ -1,9 +1,11 @@
 import type {
   ApiState,
+  CapturePrefs,
   RegistrationStatus,
   SetHotkeysResponse,
   SettingsAllResponse
 } from '../../shared/types'
+import { DEFAULT_PREFS } from '../../shared/types'
 import { initTheme } from '../shared/theme'
 
 initTheme()
@@ -28,6 +30,7 @@ const accountTitle = document.getElementById('account-title') as HTMLElement
 const accountSub = document.getElementById('account-sub') as HTMLElement
 const btnLogin = document.getElementById('btn-login') as HTMLButtonElement
 const btnChangeKey = document.getElementById('btn-change-key') as HTMLButtonElement
+const btnRemoveKey = document.getElementById('btn-remove-key') as HTMLButtonElement
 const keyRow = document.getElementById('key-row') as HTMLElement
 const apiKeyInput = document.getElementById('api-key-input') as HTMLInputElement
 const saveKeyBtn = document.getElementById('btn-save-key') as HTMLButtonElement
@@ -57,6 +60,7 @@ async function loadAll(): Promise<void> {
   applyRegistration(current.registration)
   applyApi(current.api)
   applyThemeButtons(current.theme)
+  applyPrefs(current.prefs ?? DEFAULT_PREFS)
 }
 
 function applyRegistration(reg: RegistrationStatus): void {
@@ -257,6 +261,64 @@ toggleStartup.addEventListener('keydown', (e) => {
   }
 })
 
+/* ── Selection & Capture preferences ───────────────────────────────────── */
+const prefGlow = document.getElementById('pref-glow') as HTMLElement
+const prefCopy = document.getElementById('pref-copy') as HTMLElement
+const prefSave = document.getElementById('pref-save') as HTMLElement
+const glowIntensityPicker = document.getElementById('glow-intensity') as HTMLElement
+const selectionDimPicker = document.getElementById('selection-dim') as HTMLElement
+
+function setToggle(el: HTMLElement, on: boolean): void {
+  el.classList.toggle('on', on)
+  el.setAttribute('aria-checked', String(on))
+}
+
+function applyPrefs(prefs: CapturePrefs): void {
+  setToggle(prefGlow, prefs.glow)
+  setToggle(prefCopy, prefs.copyToClipboard)
+  setToggle(prefSave, prefs.saveCaptures)
+  glowIntensityPicker
+    .querySelectorAll('.seg-btn')
+    .forEach((b) => b.classList.toggle('active', (b as HTMLElement).dataset.glow === prefs.glowIntensity))
+  selectionDimPicker
+    .querySelectorAll('.seg-btn')
+    .forEach((b) => b.classList.toggle('active', (b as HTMLElement).dataset.dim === prefs.selectionDim))
+}
+
+async function pushPrefs(patch: Partial<CapturePrefs>): Promise<void> {
+  const next = (await window.gdc.settings.setPrefs(patch)) as CapturePrefs
+  applyPrefs(next)
+}
+
+function wireToggle(el: HTMLElement, key: 'glow' | 'copyToClipboard' | 'saveCaptures'): void {
+  const flip = (): void => void pushPrefs({ [key]: !el.classList.contains('on') })
+  el.addEventListener('click', flip)
+  el.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault()
+      flip()
+    }
+  })
+}
+wireToggle(prefGlow, 'glow')
+wireToggle(prefCopy, 'copyToClipboard')
+wireToggle(prefSave, 'saveCaptures')
+
+glowIntensityPicker.querySelectorAll('.seg-btn').forEach((b) =>
+  b.addEventListener('click', () => {
+    const v = (b as HTMLElement).dataset.glow
+    if (v === 'subtle' || v === 'balanced' || v === 'vivid') void pushPrefs({ glowIntensity: v })
+  })
+)
+selectionDimPicker.querySelectorAll('.seg-btn').forEach((b) =>
+  b.addEventListener('click', () => {
+    const v = (b as HTMLElement).dataset.dim
+    if (v === 'none' || v === 'light' || v === 'classic') void pushPrefs({ selectionDim: v })
+  })
+)
+
+window.gdc.settings.onPrefsChanged((payload) => applyPrefs(payload as CapturePrefs))
+
 /* ── Gemini API ─────────────────────────────────────────────────────────── */
 function applyApi(state: ApiState): void {
   const connected = state.hasKey
@@ -269,6 +331,7 @@ function applyApi(state: ApiState): void {
     keyRow.hidden = true
     keyStatus.hidden = true
     btnChangeKey.hidden = false
+    btnRemoveKey.hidden = false
   } else {
     accountTitle.textContent = 'Not connected'
     accountSub.textContent = 'Create a free key at aistudio.google.com/apikey, then paste it here.'
@@ -276,6 +339,7 @@ function applyApi(state: ApiState): void {
     btnLogin.disabled = false
     keyRow.hidden = false
     btnChangeKey.hidden = true
+    btnRemoveKey.hidden = true
   }
   modelSub.textContent = state.model || 'gemini-3.6-flash'
 }
@@ -316,10 +380,27 @@ async function saveKey(): Promise<void> {
   }
 }
 
-btnLogin.addEventListener('click', () => void window.gdc.settings.openApiKeys())
+btnLogin.addEventListener('click', () => {
+  // Connected → manage the stored key right here; otherwise go get one.
+  if (current?.api.hasKey) {
+    keyRow.hidden = !keyRow.hidden
+    if (!keyRow.hidden) apiKeyInput.focus()
+  } else {
+    void window.gdc.settings.openApiKeys()
+  }
+})
 btnChangeKey.addEventListener('click', () => {
   keyRow.hidden = !keyRow.hidden
   if (!keyRow.hidden) apiKeyInput.focus()
+})
+btnRemoveKey.addEventListener('click', () => {
+  void window.gdc.settings.clearApiKey().then((state) => {
+    applyApi(state as ApiState)
+    apiKeyInput.value = ''
+    keyStatus.hidden = false
+    keyStatus.className = 'key-status ok'
+    keyStatus.textContent = 'Key removed from this PC.'
+  })
 })
 saveKeyBtn.addEventListener('click', () => void saveKey())
 apiKeyInput.addEventListener('keydown', (e) => {
