@@ -58,7 +58,7 @@ If you've searched for *"Circle to Search on Windows"*, *"Gemini desktop app"*, 
 | **💬 Gemini pill** | Android-style bottom capsule: **＋ capture · prompt · model chips · send**. Expands into a scrollable chat sheet with **New Chat** and **Minimise** capsules. |
 | **🛠 Lens action toolbar** | **Ask Gemini** (hands the crop to the chat), **Copy**, **Save**, **Retry**, **Open in browser**, **Close**. |
 | **🧠 Quick actions** | Explain · Summarize · Translate · Solve · Write code — appear on an empty chat and right after attaching a capture. |
-| **⏹ Stop / 🎤 Voice / 📋 Copy** | Cancel mid-stream and keep the partial answer · Windows voice typing (Win+H) into the prompt · copy buttons on every answer and code block. |
+| **⏹ Stop / 📋 Copy** | Cancel mid-stream and keep the partial answer · copy buttons on every answer and code block. |
 | **🔀 Model switcher** | Toggle **gemini-3.6-flash** / **gemini-3.5-flash-lite** right inside the pill. |
 | **🎨 Two professional themes** | Greyish **graphite dark** and **soft white** light. Solid, bold surfaces — no transparency, no rainbow gradients. |
 | **✨ Capture options** | Glow on/off + intensity (Subtle/Balanced/Vivid), focus dim (None/Light/Classic), copy crops to clipboard, auto-save PNGs to Pictures. |
@@ -222,7 +222,6 @@ Useful scripts: `npm run typecheck`, `npm run build`, `npm run icons`, `node scr
 
 - [x] Android-style Gemini pill with expanding chat
 - [x] Apple-Intelligence-style edge glow + clean lossless captures
-- [x] Voice input (Windows voice typing)
 - [ ] Free-form lasso selection
 - [ ] Local answer history with full-text search
 - [ ] Code-signed installer + delta updates

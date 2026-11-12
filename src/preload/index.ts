@@ -32,7 +32,6 @@ const IPC = {
   GeminiMinimize: 'gemini:minimize',
   GeminiPip: 'gemini:pip',
   GeminiStop: 'gemini:stop',
-  GeminiDictate: 'gemini:dictate',
   WidgetShown: 'widget:shown',
   WidgetResize: 'widget:resize',
   ThemeChanged: 'theme:changed',
@@ -52,17 +51,11 @@ const IPC = {
   SettingsOpenApiKeys: 'settings:open-apikeys',
   SettingsCheckUpdates: 'settings:check-updates',
   SettingsSetTheme: 'settings:set-theme',
-  SettingsSetOrbSide: 'settings:set-orb-side',
   SettingsSetPrefs: 'settings:set-prefs',
   PrefsChanged: 'prefs:changed',
-  OrbSideChanged: 'orb-side:changed',
   ApiChanged: 'api:changed',
   AppOpenExternal: 'app:open-external',
   AppStartCircle: 'app:start-circle',
-  OrbOpen: 'orb:open',
-  OrbDragStart: 'orb:drag-start',
-  OrbDragMove: 'orb:drag-move',
-  OrbDragEnd: 'orb:drag-end',
   AppShowWidget: 'app:show-widget',
   WindowClose: 'window:close',
   WindowMinimize: 'window:minimize'
@@ -102,7 +95,6 @@ const api = {
     close: () => ipcRenderer.invoke(IPC.GeminiClose),
     minimize: () => ipcRenderer.invoke(IPC.GeminiMinimize),
     stop: () => ipcRenderer.invoke(IPC.GeminiStop),
-    dictate: () => ipcRenderer.invoke(IPC.GeminiDictate) as Promise<{ ok: boolean; error?: string }>,
     onStatus: (cb: Listener<unknown>) => subscribe(IPC.GeminiStatus, cb),
     onChunk: (cb: Listener<unknown>) => subscribe(IPC.GeminiChunk, cb),
     onDone: (cb: Listener<unknown>) => subscribe(IPC.GeminiDone, cb),
@@ -129,11 +121,9 @@ const api = {
       ipcRenderer.invoke(IPC.SettingsSetHotkeys, hotkeys),
     setStartup: (enabled: boolean) => ipcRenderer.invoke(IPC.SettingsSetStartup, enabled),
     setTheme: (theme: string) => ipcRenderer.invoke(IPC.SettingsSetTheme, theme),
-    setOrbSide: (side: string) => ipcRenderer.invoke(IPC.SettingsSetOrbSide, side),
     setPrefs: (prefs: Record<string, unknown>) => ipcRenderer.invoke(IPC.SettingsSetPrefs, prefs),
     onPrefsChanged: (cb: Listener<unknown>) => subscribe(IPC.PrefsChanged, cb),
     onThemeChanged: (cb: Listener<string>) => subscribe(IPC.ThemeChanged, cb),
-    onOrbSideChanged: (cb: Listener<string>) => subscribe(IPC.OrbSideChanged, cb),
     checkApi: () => ipcRenderer.invoke(IPC.SettingsCheckApi),
     setApiKey: (key: string) => ipcRenderer.invoke(IPC.SettingsSetApiKey, key),
     clearApiKey: () => ipcRenderer.invoke(IPC.SettingsClearApiKey),
@@ -153,14 +143,6 @@ const api = {
     askGemini: () => ipcRenderer.invoke(IPC.LensAskGemini),
     closePanel: () => ipcRenderer.invoke(IPC.WindowClose),
     onError: (cb: Listener<unknown>) => subscribe('lens:error', cb)
-  },
-
-  /** Orb (minimized palette) controls. */
-  orb: {
-    open: () => ipcRenderer.invoke(IPC.OrbOpen),
-    dragStart: () => ipcRenderer.send(IPC.OrbDragStart),
-    dragMove: (dx: number, dy: number) => ipcRenderer.send(IPC.OrbDragMove, dx, dy),
-    dragEnd: () => ipcRenderer.send(IPC.OrbDragEnd)
   },
 
   /** Model switcher (palette). */

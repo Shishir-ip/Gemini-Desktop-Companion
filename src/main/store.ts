@@ -8,7 +8,6 @@ export type StoreSchema = {
   launchAtStartup: boolean
   welcomed: boolean
   theme: 'auto' | 'dark' | 'light'
-  orbPosition: 'left' | 'right'
   prefs: CapturePrefs
   /** safeStorage-encrypted Gemini API key (base64) */
   apiKeyEnc?: string
@@ -26,7 +25,6 @@ export const store = new Store<StoreSchema>({
     launchAtStartup: true,
     welcomed: false,
     theme: 'dark',
-    orbPosition: 'right',
     prefs: DEFAULT_PREFS
   }
 })

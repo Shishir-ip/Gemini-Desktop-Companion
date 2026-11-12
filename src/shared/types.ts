@@ -83,7 +83,6 @@ export interface SettingsAllResponse {
   startup: boolean
   api: ApiState
   theme: 'auto' | 'dark' | 'light'
-  orbPosition: 'left' | 'right'
   prefs: CapturePrefs
   isDev: boolean
 }

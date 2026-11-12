@@ -29,7 +29,6 @@ export const IPC = {
   GeminiMinimize: 'gemini:minimize',
   GeminiPip: 'gemini:pip',
   GeminiStop: 'gemini:stop',
-  GeminiDictate: 'gemini:dictate', // mic button → Windows voice typing (Win+H)
   WidgetShown: 'widget:shown',
   WidgetResize: 'widget:resize',
   ThemeChanged: 'theme:changed',
@@ -51,19 +50,13 @@ export const IPC = {
   SettingsOpenApiKeys: 'settings:open-apikeys',
   SettingsCheckUpdates: 'settings:check-updates',
   SettingsSetTheme: 'settings:set-theme',
-  SettingsSetOrbSide: 'settings:set-orb-side',
   SettingsSetPrefs: 'settings:set-prefs',
   PrefsChanged: 'prefs:changed', // main → UIs
-  OrbSideChanged: 'orb-side:changed',
   ApiChanged: 'api:changed', // main → UIs
 
   // ── Generic ─────────────────────────────────────────────────────────────
   AppOpenExternal: 'app:open-external',
   AppStartCircle: 'app:start-circle',
-  OrbOpen: 'orb:open',
-  OrbDragStart: 'orb:drag-start',
-  OrbDragMove: 'orb:drag-move',
-  OrbDragEnd: 'orb:drag-end',
   AppShowWidget: 'app:show-widget',
   WindowClose: 'window:close',
   WindowMinimize: 'window:minimize'
