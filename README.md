@@ -137,6 +137,18 @@ It's a faithful desktop recreation: hotkey → frozen screen → drag to select 
 </details>
 
 <details>
+<summary><b>Is there a Gemini assistant for Windows?</b></summary>
+
+Yes — **Hold to Gemini** is a system-wide Gemini assistant for Windows. Press <kbd>Alt</kbd>+<kbd>Space</kbd> anywhere and a floating Gemini pill appears: chat, attach any screen region with the <kbd>+</kbd> button, and get streaming answers with full conversation context. Works on Windows 10 and 11.
+</details>
+
+<details>
+<summary><b>How do I get Circle to Search on Windows 10/11?</b></summary>
+
+Download the installer from the [latest release](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases/latest), run it, and press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> — then drag around anything on screen to search it with Google Lens. No API key or account setup needed for Circle to Search.
+</details>
+
+<details>
 <summary><b>Does it work without a Gemini API key?</b></summary>
 
 Yes — **Circle to Search / Google Lens works without any key**. The key is only needed for the Hold to Gemini chat (free tier from Google AI Studio).
@@ -234,6 +246,6 @@ Useful scripts: `npm run typecheck`, `npm run build`, `npm run icons`, `node scr
 
 **If this saves you a context-switch, consider leaving a ⭐ — it genuinely helps.**
 
-<sub>Keywords: Circle to Search for Windows · Circle to Search PC · Gemini desktop app · Google Lens for Windows · AI screen search · hold to Gemini · screenshot search · select screen area and search · Android Circle to Search on laptop · Electron AI assistant · Windows tray AI tool</sub>
+<sub>Keywords: Circle to Search for Windows · Circle to Search windows app · Circle to Search PC · Gemini for Windows · Gemini assistant for Windows · Gemini desktop app · Google Lens for Windows · AI screen search · hold to Gemini · screenshot search · select screen area and search · Android Circle to Search on laptop · Electron AI assistant · Windows tray AI tool</sub>
 
 </div>
