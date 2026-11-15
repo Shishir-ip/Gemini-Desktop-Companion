@@ -119,7 +119,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-si
 ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#33456e,#3d3566);border-radius:8px;border:2px solid var(--bg2)}
 ::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#4f8cff,#a78bfa)}
 html{scrollbar-color:#3d4570 var(--bg2);scrollbar-width:thin}
-img{max-width:100%;display:block}
+img{max-width:100%;height:auto;display:block}
 a{color:var(--blue2);text-decoration:none}
 .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
 section{scroll-margin-top:calc(var(--nav-h) + 16px);position:relative}
@@ -222,6 +222,7 @@ kbd{display:inline-block;padding:2px 8px;border-radius:7px;border:1px solid var(
 .pillar h3{font-size:23px;margin:14px 0 10px}
 .pillar p{color:var(--muted);font-size:15px}
 .pillar .shot{margin:20px 0;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.pillar .shot img{width:100%;height:auto}
 .pillar ul{list-style:none;display:grid;gap:9px;margin-top:4px}
 .pillar li{display:flex;gap:10px;font-size:14px;color:var(--muted)}
 .pillar li svg{flex:none;margin-top:3px}
@@ -408,7 +409,7 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;background:rgba(10,1
         <span class="hotkey-tag"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></span>
         <h3>🎯 Circle to Search for PC</h3>
         <p>Freeze every monitor with an edge glow, drag a pixel-exact box around <b>anything</b> — text, a product, a plant, an error message — and Google Lens results slide in from the right.</p>
-        <div class="shot"><img src="screenshots/03-selection.png" width="1920" height="1080" loading="lazy" alt="Dragging a glowing selection rectangle over the desktop with Circle to Search on Windows, with a live pixel-size tooltip"></div>
+        <div class="shot"><img src="screenshots/03-selection-card.png" width="1330" height="720" loading="lazy" alt="Circle to Search on Windows: a glowing selection rectangle drawn over the app window with a live 875 x 475 pixel-size tooltip"></div>
         <ul>
           <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34a853" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg><span><b>No API key needed</b> — works the second you install it</span></li>
           <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34a853" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg><span><b>HiDPI &amp; multi-monitor</b> aware, lossless crops</span></li>
@@ -419,7 +420,7 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;background:rgba(10,1
         <span class="hotkey-tag"><kbd>Alt</kbd>+<kbd>Space</kbd></span>
         <h3>✨ Hold to Gemini</h3>
         <p>An Android-style floating <b>Gemini pill</b> appears over any app. Ask questions, attach what's on screen with <b>＋</b>, and watch answers stream in — powered by the official Google Gemini API.</p>
-        <div class="shot"><img src="screenshots/05-gemini-pill.png" width="1920" height="1080" loading="lazy" alt="The floating Gemini pill at the bottom of a Windows screen with capture button, prompt bar and model chips"></div>
+        <div class="shot"><img src="screenshots/05-gemini-pill-card.png" width="1060" height="475" loading="lazy" alt="The floating Gemini pill over a Windows app: quick-action chips, the Ask Gemini prompt bar, model toggles and the send button"></div>
         <ul>
           <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34a853" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg><span><b>Streaming chat</b> with full conversation context</span></li>
           <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34a853" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg><span>Quick actions: <b>Explain · Summarize · Translate · Solve · Code</b></span></li>
