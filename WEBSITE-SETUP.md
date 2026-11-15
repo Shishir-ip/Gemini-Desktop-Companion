@@ -49,6 +49,10 @@ This is the dialog from your screenshot (`search.google.com` → Search Console)
 
 **Alternative (HTML file method):** if you prefer, download the `googleXXXX.html` file Google offers, drop it into `docs/`, commit & push, then click Verify. Either method works; the meta tag is simplest.
 
+> ✅ **Done via HTML file method:** `docs/google8360442c8907a1ef.html` is deployed and served at
+> `https://shishir-ip.github.io/Gemini-Desktop-Companion/google8360442c8907a1ef.html`.
+> **Never delete or rename this file** — Google re-checks it periodically and ownership will be revoked if it disappears.
+
 ## Step 4 — Submit your sitemap
 
 1. In Search Console, left sidebar → **Sitemaps** (under Indexing).
