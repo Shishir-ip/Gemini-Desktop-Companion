@@ -6,6 +6,7 @@
 
 Select anything on your screen and search it with **Google Lens**, or summon a floating **Google Gemini** pill over any app. Instant wake, pixel-clean captures, and an Apple-Intelligence-style edge glow.
 
+[![Website](https://img.shields.io/badge/🌐_Website-Landing%20page-4f8cff?style=flat-square)](https://shishir-ip.github.io/Gemini-Desktop-Companion/)
 [![Release](https://img.shields.io/github/v/release/Shishir-ip/Gemini-Desktop-Companion?style=flat-square&logo=github&color=4a68b0)](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Shishir-ip/Gemini-Desktop-Companion/total?style=flat-square&logo=github&color=3d9968)](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078d4?style=flat-square&logo=windows11&logoColor=white)](#-getting-started)
@@ -17,7 +18,7 @@ Select anything on your screen and search it with **Google Lens**, or summon a f
 
 [![Download for Windows](https://img.shields.io/badge/⬇%20DOWNLOAD%20FOR%20WINDOWS-Free%20·%20v4.1.0-4a68b0?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases/latest/download/Gemini-Desktop-Companion-Setup.exe)
 
-**[⬇ Download the installer](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases/latest/download/Gemini-Desktop-Companion-Setup.exe)** · [All releases](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases) · [Report a bug](https://github.com/Shishir-ip/Gemini-Desktop-Companion/issues)
+**[🌐 Official website](https://shishir-ip.github.io/Gemini-Desktop-Companion/)** · **[⬇ Download the installer](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases/latest/download/Gemini-Desktop-Companion-Setup.exe)** · [All releases](https://github.com/Shishir-ip/Gemini-Desktop-Companion/releases) · [Report a bug](https://github.com/Shishir-ip/Gemini-Desktop-Companion/issues)
 
 <sub>Windows 10/11 (64-bit) · ~78 MB · No account needed to install · Free Gemini API key connects in 30 seconds</sub>
 
